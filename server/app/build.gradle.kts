@@ -29,7 +29,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     // opendataloader-pdf-core
-    implementation("org.opendataloader:opendataloader-pdf-core:1.11.0")
+    implementation("org.opendataloader:opendataloader-pdf-core:2.4.3")
 
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.13")
