@@ -15,6 +15,9 @@ val ktorVersion = "3.1.3"
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://artifactory.openpreservation.org/artifactory/vera-dev")
+    }
 }
 
 dependencies {
@@ -24,6 +27,9 @@ dependencies {
     implementation("io.ktor:ktor-server-cors:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
+    // opendataloader-pdf-core
+    implementation("org.opendataloader:opendataloader-pdf-core:1.11.0")
 
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.13")

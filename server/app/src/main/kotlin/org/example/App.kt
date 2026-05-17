@@ -7,6 +7,7 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import org.opendataloader.pdf.api.OpenDataLoaderPDF
 import java.net.ServerSocket
 
 /**
@@ -27,6 +28,8 @@ fun main() {
  * Ktor 애플리케이션 모듈.
  *
  * 플러그인 설치 및 라우트 등록을 담당한다.
+ * 앱 종료 이벤트([ApplicationStopped])에서 [OpenDataLoaderPDF.shutdown]을 1회 호출하여
+ * 내부 스레드 풀을 정리한다 (ADR-002).
  */
 fun Application.module() {
     install(ContentNegotiation) { json() }
@@ -36,6 +39,10 @@ fun Application.module() {
         allowMethod(HttpMethod.Post)
     }
     configureRouting()
+
+    monitor.subscribe(ApplicationStopped) {
+        OpenDataLoaderPDF.shutdown()
+    }
 }
 
 /**

@@ -5,15 +5,12 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.example.models.ConvertRequest
 import org.example.models.ConvertResponse
-import org.example.models.JobResult
 import org.example.models.JobStatus
-import org.example.models.ProgressEvent
 
 /**
  * 애플리케이션의 모든 HTTP 라우트를 등록한다.
@@ -77,30 +74,12 @@ fun Application.configureRouting() {
 /**
  * 실제 변환 작업을 수행한다.
  *
- * 현재는 opendataloader-pdf-core 통합 전 stub 구현으로,
- * 더미 진행 이벤트를 전송하고 완료 처리한다.
- * Phase 1 Step 2에서 실제 변환 로직으로 교체 예정.
+ * [Converter.convert]에 위임하여 opendataloader-pdf-core로 변환을 실행하고
+ * 진행 상황을 SSE 채널로 전송한다.
  *
  * @param jobId 대상 작업 식별자
  * @param request 변환 요청 데이터
  */
 private suspend fun runConversion(jobId: String, request: ConvertRequest) {
-    JobManager.markRunning(jobId)
-
-    // TODO: opendataloader-pdf-core 통합 후 실제 변환 로직으로 교체
-    JobManager.sendProgress(jobId, ProgressEvent(step = 1, label = "페이지 분석 중", percent = 10))
-    delay(500)
-    JobManager.sendProgress(jobId, ProgressEvent(step = 2, label = "변환 중", percent = 50, eta = 5))
-    delay(500)
-    JobManager.sendProgress(jobId, ProgressEvent(step = 3, label = "완료", percent = 100))
-
-    JobManager.markDone(
-        jobId,
-        JobResult(
-            jobId = jobId,
-            status = JobStatus.DONE.name,
-            markdownPath = "${request.outputDir ?: "."}/output.md",
-            jsonPath = "${request.outputDir ?: "."}/output.json"
-        )
-    )
+    Converter.convert(jobId, request)
 }
