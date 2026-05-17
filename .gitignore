@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin / JVM
+*.class
+*.kotlin_module
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Tauri / Rust
+src-tauri/target/
+
+# Node
+node_modules/
+frontend/dist/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
