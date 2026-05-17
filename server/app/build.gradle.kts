@@ -8,6 +8,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.shadow)
     application
 }
 
@@ -53,4 +54,9 @@ application {
 tasks.named<Test>("test") {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+}
+
+// fat JAR 출력 파일명을 server.jar로 고정 (Tauri 리소스 참조용)
+tasks.shadowJar {
+    archiveFileName = "server.jar"
 }

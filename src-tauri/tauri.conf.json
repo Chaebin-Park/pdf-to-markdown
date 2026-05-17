@@ -13,14 +13,14 @@
     "windows": [
       {
         "title": "PDF to Markdown",
-        "width": 800,
-        "height": 600,
+        "width": 1280,
+        "height": 800,
         "resizable": true,
         "fullscreen": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src http://localhost:* 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
@@ -33,6 +33,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../server/app/build/libs/server.jar": "server.jar"
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
