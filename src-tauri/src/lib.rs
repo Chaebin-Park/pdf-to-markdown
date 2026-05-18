@@ -16,6 +16,15 @@ struct ServerState {
     port: Mutex<Option<u16>>,
 }
 
+/// docling-serve 프로세스의 포트 상태.
+///
+/// 하이브리드 모드가 활성화된 경우에만 사용된다.
+/// 프로세스 핸들은 `run()` 클로저와 공유해야 하므로 별도 [Arc]로 관리한다.
+struct DoclingState {
+    /// docling-serve가 수신 중인 포트. 기동 완료 전에는 `None`.
+    port: Mutex<Option<u16>>,
+}
+
 /// WebView에서 Ktor 서버 포트를 조회하는 Tauri command.
 ///
 /// 서버 기동 전에는 `null`을 반환하므로 프론트엔드는 `server-ready` 이벤트 수신 후 호출해야 한다.
@@ -50,8 +59,14 @@ pub fn run() {
     let process_handle: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
     let process_handle_for_run = Arc::clone(&process_handle);
 
+    let docling_handle: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
+    let docling_handle_for_run = Arc::clone(&docling_handle);
+
     tauri::Builder::default()
         .manage(ServerState {
+            port: Mutex::new(None),
+        })
+        .manage(DoclingState {
             port: Mutex::new(None),
         })
         .setup(move |app| {
@@ -122,6 +137,12 @@ pub fn run() {
                     if let Some(child) = guard.as_mut() {
                         let _ = child.kill();
                         log::info!("Ktor server process terminated");
+                    }
+                }
+                if let Ok(mut guard) = docling_handle_for_run.lock() {
+                    if let Some(child) = guard.as_mut() {
+                        let _ = child.kill();
+                        log::info!("docling-serve process terminated");
                     }
                 }
             }
