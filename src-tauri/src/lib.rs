@@ -156,6 +156,7 @@ async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
             "--python",
             venv_dir.to_str().unwrap(),
             "opendataloader-pdf[hybrid]",
+            "docling-serve",
         ])
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
