@@ -11,7 +11,7 @@
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
-import { isDoclingReady } from "./docling-state";
+import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
 
 // public/pdf.worker.min.mjs 를 직접 참조한다.
 // npm install 후 postinstall 스크립트로 복사되며,
@@ -313,6 +313,8 @@ function registerModeWarning(): void {
   };
 
   select.addEventListener("change", update);
+  // docling 준비 상태 변경 시 경고 아이콘 자동 갱신
+  onDoclingReadyChange(() => update());
   // 복원된 값으로 경고 초기 상태 설정
   update();
 }
