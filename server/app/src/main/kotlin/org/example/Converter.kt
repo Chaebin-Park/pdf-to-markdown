@@ -76,10 +76,10 @@ object Converter {
             isGenerateJSON = true
             when (mode) {
                 ConvertMode.HYBRID -> {
-                    hybrid = Config.HYBRID_DOCLING
+                    hybrid = Config.HYBRID_DOCLING_FAST
                 }
                 ConvertMode.OCR, ConvertMode.FORMULA -> {
-                    hybrid = Config.HYBRID_DOCLING
+                    hybrid = Config.HYBRID_DOCLING_FAST
                     hybridConfig.mode = HybridConfig.MODE_FULL
                 }
                 ConvertMode.STANDARD -> { /* 기본값 사용 — Java 파서만 실행 */ }
