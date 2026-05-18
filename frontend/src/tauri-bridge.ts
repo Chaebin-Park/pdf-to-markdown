@@ -55,6 +55,11 @@ export function startDoclingServe(): Promise<void> {
   return invoke<void>("start_docling_serve");
 }
 
+/** 하이브리드 모드 환경(venv + 플래그 파일)을 삭제하고 docling-serve를 종료한다. */
+export function uninstallHybrid(): Promise<void> {
+  return invoke<void>("uninstall_hybrid");
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------

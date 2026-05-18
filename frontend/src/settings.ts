@@ -9,6 +9,7 @@
 import {
   checkHybridInstalled,
   installHybrid,
+  uninstallHybrid,
   onInstallProgress,
   onInstallLog,
   startDoclingServe,
@@ -83,8 +84,12 @@ function renderModal(installed: boolean): void {
   };
   document.addEventListener("keydown", onKey);
 
-  // 설치 버튼 클릭 핸들러
-  document.getElementById("hybrid-install-btn")?.addEventListener("click", () => startInstall());
+  // 설치/제거 버튼 — install-area 내 동적 교체를 대비해 이벤트 위임
+  document.getElementById("settings-install-area")?.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.id === "hybrid-install-btn") startInstall();
+    if (target.id === "hybrid-uninstall-btn") startUninstall();
+  });
 }
 
 function renderInstallButton(): string {
@@ -92,7 +97,10 @@ function renderInstallButton(): string {
 }
 
 function renderInstalledState(): string {
-  return `<span class="settings-installed-text">✓ Hybrid 모드가 활성화되어 있습니다.</span>`;
+  return `
+    <span class="settings-installed-text">✓ Hybrid 모드가 활성화되어 있습니다.</span>
+    <button class="settings-uninstall-btn" id="hybrid-uninstall-btn">제거</button>
+  `;
 }
 
 function closeModal(): void {
@@ -169,6 +177,38 @@ async function markInstallComplete(badge: HTMLElement | null): Promise<void> {
     await startDoclingServe();
   } catch (e) {
     console.warn("[docling] 설치 후 자동 시작 실패:", e);
+  }
+}
+
+async function startUninstall(): Promise<void> {
+  const confirmed = window.confirm(
+    "Hybrid 모드를 제거하면 venv 환경(약 1~2GB)이 삭제됩니다.\n계속하시겠습니까?"
+  );
+  if (!confirmed) return;
+
+  const uninstallBtn = document.getElementById("hybrid-uninstall-btn") as HTMLButtonElement | null;
+  if (uninstallBtn) {
+    uninstallBtn.disabled = true;
+    uninstallBtn.textContent = "제거 중…";
+  }
+
+  try {
+    await uninstallHybrid();
+    setDoclingReady(false);
+
+    const badge = document.getElementById("hybrid-badge");
+    if (badge) {
+      badge.className = "settings-badge badge-off";
+      badge.textContent = "미설치";
+    }
+    const installArea = document.getElementById("settings-install-area");
+    if (installArea) installArea.innerHTML = renderInstallButton();
+  } catch (e) {
+    if (uninstallBtn) {
+      uninstallBtn.disabled = false;
+      uninstallBtn.textContent = "제거";
+    }
+    alert(`제거 실패: ${e}`);
   }
 }
 

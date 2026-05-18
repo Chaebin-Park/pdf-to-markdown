@@ -185,6 +185,46 @@ async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 하이브리드 모드 Python 환경을 제거하는 Tauri command.
+///
+/// 실행 중인 docling-serve를 종료하고 venv 디렉토리와 `.hybrid_installed` 플래그 파일을 삭제한다.
+/// DoclingState 포트도 초기화하여 이후 startDoclingServe 호출이 다시 가능하도록 한다.
+#[tauri::command]
+fn uninstall_hybrid(
+    app: tauri::AppHandle,
+    handle_state: tauri::State<'_, DoclingHandle>,
+    docling_state: tauri::State<'_, DoclingState>,
+) -> Result<(), String> {
+    // 실행 중인 docling-serve 종료
+    if let Ok(mut guard) = handle_state.0.lock() {
+        if let Some(child) = guard.as_mut() {
+            let _ = child.kill();
+        }
+        *guard = None;
+    }
+    *docling_state.port.lock().unwrap() = None;
+
+    let cache_dir = app
+        .path()
+        .cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("opendataloader");
+
+    let venv_dir = cache_dir.join("venv");
+    if venv_dir.exists() {
+        std::fs::remove_dir_all(&venv_dir)
+            .map_err(|e| format!("venv 삭제 실패: {e}"))?;
+    }
+
+    let flag = cache_dir.join(".hybrid_installed");
+    if flag.exists() {
+        std::fs::remove_file(&flag)
+            .map_err(|e| format!("플래그 파일 삭제 실패: {e}"))?;
+    }
+
+    Ok(())
+}
+
 /// 지정 포트로 TCP 연결을 시도하며 서버 기동을 확인한다.
 ///
 /// `timeout_secs` 초 내에 연결이 성공하면 `true`, 타임아웃이면 `false`를 반환한다.
@@ -376,6 +416,7 @@ pub fn run() {
             get_server_port,
             check_hybrid_installed,
             install_hybrid,
+            uninstall_hybrid,
             start_docling_serve,
             get_docling_port,
             save_temp_pdf,
