@@ -3,12 +3,12 @@ import "highlight.js/styles/github-dark.css";
 import { getServerPort, onServerReady } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
 import { mountPdfViewer, setConvertHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
-import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
+import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown, setHelpHandler } from "./markdown-renderer";
 import { convertPdf } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
 import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
 import { readTextFile } from "./tauri-bridge";
-import { maybeShowOnboarding } from "./onboarding";
+import { maybeShowOnboarding, showOnboarding } from "./onboarding";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -58,7 +58,8 @@ function renderApp(root: HTMLDivElement): void {
   const layoutEl = root.querySelector<HTMLElement>(".layout")!;
   mountProgressBar(layoutEl);
 
-  // 최초 실행 시 온보딩 모달 표시
+  // 최초 실행 시 온보딩 모달 표시; ? 버튼으로 재호출 가능
+  setHelpHandler(() => showOnboarding());
   maybeShowOnboarding();
 
   setConvertHandler(async () => {
