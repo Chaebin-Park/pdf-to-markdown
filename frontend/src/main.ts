@@ -1,7 +1,9 @@
 import "./style.css";
+import "highlight.js/styles/github-dark.css";
 import { getServerPort, onServerReady } from "./tauri-bridge";
-import { mountLayout, getPanelLeft } from "./layout";
+import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
 import { mountPdfViewer } from "./pdf-viewer";
+import { mountMarkdownRenderer } from "./markdown-renderer";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -45,7 +47,7 @@ function renderLoading(root: HTMLDivElement): void {
 function renderApp(root: HTMLDivElement): void {
   mountLayout(root);
   mountPdfViewer(getPanelLeft());
-  // TODO(3-5): 우측 패널에 Markdown 렌더러 마운트
+  mountMarkdownRenderer(getPanelRight());
 }
 
 init();

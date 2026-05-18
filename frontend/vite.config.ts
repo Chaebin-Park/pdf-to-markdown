@@ -8,5 +8,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // highlight.js 포함 시 번들이 커지지만 Tauri 데스크탑 앱이므로 무방하다.
+    chunkSizeWarningLimit: 1500,
   },
 });
