@@ -11,8 +11,11 @@ import {
   installHybrid,
   onInstallProgress,
   onInstallLog,
+  startDoclingServe,
+  onDoclingReady,
   type InstallProgress,
 } from "./tauri-bridge";
+import { setDoclingReady } from "./docling-state";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -123,7 +126,7 @@ async function startInstall(): Promise<void> {
     // 완료
     unlistenProgress();
     unlistenLog();
-    markInstallComplete(badge);
+    await markInstallComplete(badge);
   } catch (e) {
     unlistenProgress();
     unlistenLog();
@@ -148,7 +151,7 @@ function appendLog(line: string): void {
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-function markInstallComplete(badge: HTMLElement | null): void {
+async function markInstallComplete(badge: HTMLElement | null): Promise<void> {
   if (badge) {
     badge.className = "settings-badge badge-on";
     badge.textContent = "설치됨";
@@ -157,6 +160,16 @@ function markInstallComplete(badge: HTMLElement | null): void {
   if (installArea) installArea.innerHTML = renderInstalledState();
   const label = document.getElementById("settings-progress-label");
   if (label) label.textContent = "설치 완료 ✓";
+
+  try {
+    const unlisten = await onDoclingReady(() => {
+      setDoclingReady(true);
+      unlisten();
+    });
+    await startDoclingServe();
+  } catch (e) {
+    console.warn("[docling] 설치 후 자동 시작 실패:", e);
+  }
 }
 
 function markInstallError(message: string): void {
