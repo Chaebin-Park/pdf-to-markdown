@@ -25,6 +25,11 @@ struct DoclingState {
     port: Mutex<Option<u16>>,
 }
 
+/// docling-serve 프로세스 핸들을 Tauri 상태로 공유하기 위한 래퍼.
+///
+/// [start_docling_serve] command와 [tauri::RunEvent::Exit] 핸들러 양쪽에서 접근한다.
+struct DoclingHandle(Arc<Mutex<Option<Child>>>);
+
 /// WebView에서 Ktor 서버 포트를 조회하는 Tauri command.
 ///
 /// 서버 기동 전에는 `null`을 반환하므로 프론트엔드는 `server-ready` 이벤트 수신 후 호출해야 한다.
@@ -64,6 +69,9 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
         .resolve(name, tauri::path::BaseDirectory::Resource)
         .map_err(|e| e.to_string())
 }
+
+/// docling-serve 고정 포트.
+const DOCLING_PORT: u16 = 5002;
 
 /// `hybrid-install-progress` 이벤트 페이로드.
 ///
@@ -197,6 +205,73 @@ fn wait_for_server(port: u16, timeout_secs: u64) -> bool {
     false
 }
 
+/// docling-serve 프로세스를 시작하는 Tauri command.
+///
+/// `<cache>/venv/bin/docling-serve run --host 127.0.0.1 --port 5002` 를 실행한다.
+/// 이미 실행 중인 경우(포트가 설정된 경우) 즉시 반환한다.
+/// 서버 기동 완료는 백그라운드 스레드에서 TCP 폴링으로 확인 후 `docling-ready` 이벤트로 알린다.
+#[tauri::command]
+fn start_docling_serve(
+    app: tauri::AppHandle,
+    handle_state: tauri::State<'_, DoclingHandle>,
+    docling_state: tauri::State<'_, DoclingState>,
+) -> Result<(), String> {
+    // 이미 실행 중이면 no-op
+    if docling_state.port.lock().unwrap().is_some() {
+        return Ok(());
+    }
+
+    let cache_dir = app
+        .path()
+        .cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("opendataloader");
+
+    #[cfg(target_os = "windows")]
+    let docling_bin = cache_dir.join("venv").join("Scripts").join("docling-serve.exe");
+    #[cfg(not(target_os = "windows"))]
+    let docling_bin = cache_dir.join("venv").join("bin").join("docling-serve");
+
+    if !docling_bin.exists() {
+        return Err(
+            "docling-serve 실행 파일을 찾을 수 없습니다. install_hybrid를 먼저 실행해 주세요."
+                .to_string(),
+        );
+    }
+
+    let child = Command::new(&docling_bin)
+        .args(["run", "--host", "127.0.0.1", "--port", &DOCLING_PORT.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("docling-serve 시작 실패: {e}"))?;
+
+    *handle_state.0.lock().unwrap() = Some(child);
+
+    // 백그라운드 스레드에서 TCP health check 후 상태 갱신 및 이벤트 emit
+    let app_handle = app.clone();
+    thread::spawn(move || {
+        if wait_for_server(DOCLING_PORT, 60) {
+            let state = app_handle.state::<DoclingState>();
+            *state.port.lock().unwrap() = Some(DOCLING_PORT);
+            let _ = app_handle.emit("docling-ready", DOCLING_PORT);
+            log::info!("docling-serve ready on port {DOCLING_PORT}");
+        } else {
+            log::error!("docling-serve did not become ready in time");
+        }
+    });
+
+    Ok(())
+}
+
+/// WebView에서 docling-serve 포트를 조회하는 Tauri command.
+///
+/// 서버 기동 전에는 `null`을 반환하므로 프론트엔드는 `docling-ready` 이벤트 수신 후 호출해야 한다.
+#[tauri::command]
+fn get_docling_port(state: tauri::State<DoclingState>) -> Option<u16> {
+    *state.port.lock().unwrap()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 프로세스 핸들은 setup 클로저와 run 클로저 양쪽에서 접근하므로 Arc로 공유
@@ -213,6 +288,7 @@ pub fn run() {
         .manage(DoclingState {
             port: Mutex::new(None),
         })
+        .manage(DoclingHandle(docling_handle))
         .setup(move |app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -274,7 +350,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_server_port,
             check_hybrid_installed,
-            install_hybrid
+            install_hybrid,
+            start_docling_serve,
+            get_docling_port
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
