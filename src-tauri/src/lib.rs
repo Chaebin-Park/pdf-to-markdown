@@ -33,6 +33,19 @@ fn get_server_port(state: tauri::State<ServerState>) -> Option<u16> {
     *state.port.lock().unwrap()
 }
 
+/// 하이브리드 모드 Python 환경이 설치되어 있는지 확인하는 Tauri command.
+///
+/// 캐시 디렉토리의 `.hybrid_installed` 플래그 파일 존재 여부로 판단한다.
+/// - macOS: `~/Library/Caches/opendataloader/.hybrid_installed`
+/// - Windows: `%LOCALAPPDATA%\opendataloader\.hybrid_installed`
+#[tauri::command]
+fn check_hybrid_installed(app: tauri::AppHandle) -> bool {
+    app.path()
+        .cache_dir()
+        .map(|dir| dir.join("opendataloader").join(".hybrid_installed").exists())
+        .unwrap_or(false)
+}
+
 /// 지정 포트로 TCP 연결을 시도하며 서버 기동을 확인한다.
 ///
 /// `timeout_secs` 초 내에 연결이 성공하면 `true`, 타임아웃이면 `false`를 반환한다.
@@ -127,7 +140,10 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_server_port])
+        .invoke_handler(tauri::generate_handler![
+            get_server_port,
+            check_hybrid_installed
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(move |_app_handle, event| {
