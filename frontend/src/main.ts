@@ -2,7 +2,7 @@ import "./style.css";
 import "highlight.js/styles/github-dark.css";
 import { getServerPort, onServerReady } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
-import { mountPdfViewer, setConvertHandler, setConverting, setBBoxAvailable, currentPdfBuffer } from "./pdf-viewer";
+import { mountPdfViewer, setConvertHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
 import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
 import { convertPdf } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
@@ -65,7 +65,8 @@ function renderApp(root: HTMLDivElement): void {
     clearMarkdown();
     setStreaming(true);
 
-    await convertPdf(buffer, "STANDARD", {
+    const mode = getSelectedMode() as Parameters<typeof convertPdf>[1];
+    await convertPdf(buffer, mode, {
       onProgress: (event) => {
         updateProgress({ percent: event.percent, label: event.label, eta: event.eta });
       },

@@ -62,6 +62,12 @@ export function mountPdfViewer(container: HTMLElement): void {
       <div class="pdf-toolbar" id="pdf-toolbar" style="display:none">
         <span class="pdf-filename" id="pdf-filename"></span>
         <span class="pdf-pagecount" id="pdf-pagecount"></span>
+        <select class="pdf-mode-select" id="pdf-mode-select" title="변환 모드 선택">
+          <option value="STANDARD">Standard</option>
+          <option value="HYBRID">Hybrid AI</option>
+          <option value="OCR">OCR</option>
+          <option value="FORMULA">Formula</option>
+        </select>
         <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
         <button class="pdf-bbox-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
       </div>
@@ -83,6 +89,12 @@ export function mountPdfViewer(container: HTMLElement): void {
  */
 export function setConvertHandler(handler: () => void): void {
   convertHandler = handler;
+}
+
+/** 현재 선택된 변환 모드를 반환한다. */
+export function getSelectedMode(): string {
+  const sel = document.getElementById("pdf-mode-select") as HTMLSelectElement | null;
+  return sel?.value ?? "STANDARD";
 }
 
 /**
