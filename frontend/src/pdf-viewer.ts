@@ -235,7 +235,8 @@ async function renderPage(page: PDFPageProxy, canvas: HTMLCanvasElement): Promis
     const scale = Number(canvas.dataset.scale);
     const viewport = page.getViewport({ scale });
     const ctx = canvas.getContext("2d")!;
-    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    // v4 API: canvas 파라미터 없음 (v5에서 추가됨)
+    await page.render({ canvasContext: ctx, viewport }).promise;
   } catch (e) {
     // 렌더링 실패 시 canvas에 오류 메시지를 표시한다.
     const ctx = canvas.getContext("2d");
