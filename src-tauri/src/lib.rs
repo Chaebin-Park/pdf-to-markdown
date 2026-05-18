@@ -46,6 +46,137 @@ fn check_hybrid_installed(app: tauri::AppHandle) -> bool {
         .unwrap_or(false)
 }
 
+/// 번들된 uv 바이너리의 경로를 반환하는 헬퍼.
+///
+/// 플랫폼과 아키텍처에 따라 리소스 파일명을 선택한다.
+/// 현재 번들: macOS arm64 (`uv-macos-arm64`).
+fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    let name = "uv-macos-arm64";
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    let name = "uv-macos-x86_64";
+    #[cfg(target_os = "windows")]
+    let name = "uv-windows-x86_64.exe";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let name = "uv";
+
+    app.path()
+        .resolve(name, tauri::path::BaseDirectory::Resource)
+        .map_err(|e| e.to_string())
+}
+
+/// `hybrid-install-progress` 이벤트 페이로드.
+///
+/// 프론트엔드에서 설치 단계와 진행률을 표시하는 데 사용된다.
+#[derive(serde::Serialize, Clone)]
+struct InstallProgress {
+    /// 현재 단계 번호 (1: Python 설치, 2: 가상 환경 생성, 3: 패키지 설치).
+    step: u8,
+    /// 사용자에게 표시할 메시지.
+    message: String,
+    /// 전체 진행률 (0–100).
+    percent: u8,
+}
+
+/// 하이브리드 모드 Python 환경을 설치하는 Tauri command.
+///
+/// 순서:
+/// 1. `uv python install 3.11` — Python 3.11 설치
+/// 2. `uv venv <cache>/venv --python 3.11` — 가상 환경 생성
+/// 3. `uv pip install --python <cache>/venv "opendataloader-pdf[hybrid]"` — 패키지 설치
+///
+/// 각 단계 전후로 `hybrid-install-progress` 이벤트를 emit한다.
+/// 패키지 설치 중 출력 라인은 `hybrid-install-log` 이벤트로 실시간 전달된다.
+/// 모든 단계 성공 시 `.hybrid_installed` 플래그 파일을 생성한다.
+#[tauri::command]
+async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
+    let uv = uv_binary_path(&app)?;
+
+    let cache_dir = app
+        .path()
+        .cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("opendataloader");
+    std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
+
+    let venv_dir = cache_dir.join("venv");
+
+    let emit = |step: u8, message: &str, percent: u8| {
+        let _ = app.emit(
+            "hybrid-install-progress",
+            InstallProgress {
+                step,
+                message: message.to_string(),
+                percent,
+            },
+        );
+    };
+
+    // Step 1: Python 3.11 설치
+    emit(1, "Python 3.11 다운로드 및 설치 중...", 5);
+    let status = Command::new(&uv)
+        .args(["python", "install", "3.11"])
+        .status()
+        .map_err(|e| format!("Python 설치 실패: {e}"))?;
+    if !status.success() {
+        return Err(format!("uv python install 실패 (exit {:?})", status.code()));
+    }
+    emit(1, "Python 3.11 설치 완료", 30);
+
+    // Step 2: 가상 환경 생성
+    emit(2, "가상 환경 생성 중...", 35);
+    let status = Command::new(&uv)
+        .args([
+            "venv",
+            venv_dir.to_str().unwrap(),
+            "--python",
+            "3.11",
+        ])
+        .status()
+        .map_err(|e| format!("가상 환경 생성 실패: {e}"))?;
+    if !status.success() {
+        return Err(format!("uv venv 실패 (exit {:?})", status.code()));
+    }
+    emit(2, "가상 환경 생성 완료", 40);
+
+    // Step 3: 패키지 설치 (stderr 실시간 스트리밍)
+    emit(3, "opendataloader-pdf[hybrid] 패키지 설치 중...", 45);
+    let mut child = Command::new(&uv)
+        .args([
+            "pip",
+            "install",
+            "--python",
+            venv_dir.to_str().unwrap(),
+            "opendataloader-pdf[hybrid]",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("패키지 설치 시작 실패: {e}"))?;
+
+    // pip 출력을 프론트엔드로 실시간 전달
+    let stderr = child.stderr.take().expect("stderr not captured");
+    let app_log = app.clone();
+    thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            let _ = app_log.emit("hybrid-install-log", line);
+        }
+    });
+
+    let status = child.wait().map_err(|e| format!("패키지 설치 대기 실패: {e}"))?;
+    if !status.success() {
+        return Err(format!("uv pip install 실패 (exit {:?})", status.code()));
+    }
+    emit(3, "패키지 설치 완료", 95);
+
+    // 설치 완료 플래그 파일 생성
+    std::fs::write(cache_dir.join(".hybrid_installed"), "")
+        .map_err(|e| format!("플래그 파일 생성 실패: {e}"))?;
+    emit(3, "하이브리드 모드 활성화 완료", 100);
+
+    Ok(())
+}
+
 /// 지정 포트로 TCP 연결을 시도하며 서버 기동을 확인한다.
 ///
 /// `timeout_secs` 초 내에 연결이 성공하면 `true`, 타임아웃이면 `false`를 반환한다.
@@ -142,7 +273,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_server_port,
-            check_hybrid_installed
+            check_hybrid_installed,
+            install_hybrid
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
