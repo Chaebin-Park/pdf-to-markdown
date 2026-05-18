@@ -17,3 +17,60 @@ body,
   color: #d4d4d4;
   font-size: 14px;
 }
+
+/* -------------------------------------------------------------------------
+   Splash / loading screen
+   ---------------------------------------------------------------------- */
+
+.splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+}
+
+.splash-label {
+  font-size: 13px;
+  color: #6b6b6b;
+  letter-spacing: 0.03em;
+}
+
+.splash-label.ready {
+  color: #4ec9b0;
+}
+
+/* 세 개의 점이 순서대로 페이드인/아웃되는 애니메이션 */
+.splash-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ec9b0;
+  opacity: 0.2;
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot-pulse {
+  0%, 80%, 100% {
+    opacity: 0.2;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
