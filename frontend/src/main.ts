@@ -2,8 +2,9 @@ import "./style.css";
 import "highlight.js/styles/github-dark.css";
 import { getServerPort, onServerReady } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
-import { mountPdfViewer } from "./pdf-viewer";
-import { mountMarkdownRenderer } from "./markdown-renderer";
+import { mountPdfViewer, setConvertHandler, setConverting, currentPdfBuffer } from "./pdf-viewer";
+import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
+import { convertPdf } from "./converter";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -48,6 +49,31 @@ function renderApp(root: HTMLDivElement): void {
   mountLayout(root);
   mountPdfViewer(getPanelLeft());
   mountMarkdownRenderer(getPanelRight());
+
+  setConvertHandler(async () => {
+    const buffer = currentPdfBuffer;
+    if (!buffer) return;
+
+    setConverting(true);
+    clearMarkdown();
+    setStreaming(true);
+
+    await convertPdf(buffer, "STANDARD", {
+      onProgress: (_event) => {
+        // TODO(3-7): 진행률 바 업데이트
+      },
+      onComplete: (markdown, _jsonPath) => {
+        setStreaming(false);
+        setMarkdown(markdown);
+        setConverting(false);
+      },
+      onError: (message) => {
+        setStreaming(false);
+        setMarkdown(`> **오류**: ${message}`);
+        setConverting(false);
+      },
+    });
+  });
 }
 
 init();

@@ -201,6 +201,29 @@ body,
   flex-shrink: 0;
 }
 
+.pdf-convert-btn {
+  margin-left: auto;
+  padding: 3px 12px;
+  font-size: 11px;
+  background: #4ec9b0;
+  border: none;
+  border-radius: 3px;
+  color: #1e1e1e;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, opacity 0.12s;
+}
+
+.pdf-convert-btn:hover {
+  background: #3db99f;
+}
+
+.pdf-convert-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Pages scroll area */
 .pdf-pages {
   flex: 1;

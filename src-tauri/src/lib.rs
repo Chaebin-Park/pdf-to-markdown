@@ -272,6 +272,31 @@ fn get_docling_port(state: tauri::State<DoclingState>) -> Option<u16> {
     *state.port.lock().unwrap()
 }
 
+/// PDF 바이트 배열을 시스템 임시 디렉터리에 저장하고 절대 경로를 반환한다.
+///
+/// Ktor 서버는 파일 경로 기반으로 변환 요청을 받으므로, 프론트엔드에서 드롭한 PDF를
+/// 임시 파일로 저장하여 경로를 전달할 때 사용한다.
+#[tauri::command]
+fn save_temp_pdf(app: tauri::AppHandle, data: Vec<u8>) -> Result<String, String> {
+    let tmp_dir = app
+        .path()
+        .temp_dir()
+        .map_err(|e| format!("임시 디렉터리 조회 실패: {e}"))?;
+    let path = tmp_dir.join("opendataloader_input.pdf");
+    std::fs::write(&path, &data).map_err(|e| format!("PDF 임시 저장 실패: {e}"))?;
+    path.to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "파일 경로 변환 실패".to_string())
+}
+
+/// 지정 경로의 텍스트 파일을 읽어 문자열로 반환한다.
+///
+/// Ktor 변환 결과로 반환된 markdownPath를 프론트엔드에서 읽을 때 사용한다.
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("파일 읽기 실패 ({path}): {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 프로세스 핸들은 setup 클로저와 run 클로저 양쪽에서 접근하므로 Arc로 공유
@@ -352,7 +377,9 @@ pub fn run() {
             check_hybrid_installed,
             install_hybrid,
             start_docling_serve,
-            get_docling_port
+            get_docling_port,
+            save_temp_pdf,
+            read_text_file
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -30,6 +30,7 @@ export let currentPdfBuffer: ArrayBuffer | null = null;
 let pdfDoc: PDFDocumentProxy | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let renderVersion = 0; // 재렌더링 시 이전 작업 취소용
+let convertHandler: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -60,6 +61,7 @@ export function mountPdfViewer(container: HTMLElement): void {
       <div class="pdf-toolbar" id="pdf-toolbar" style="display:none">
         <span class="pdf-filename" id="pdf-filename"></span>
         <span class="pdf-pagecount" id="pdf-pagecount"></span>
+        <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
       </div>
       <div class="pdf-pages" id="pdf-pages" style="display:none"></div>
     </div>
@@ -67,6 +69,29 @@ export function mountPdfViewer(container: HTMLElement): void {
 
   registerDragAndDrop(container);
   registerFileInput(container);
+
+  document.getElementById("pdf-convert-btn")?.addEventListener("click", () => {
+    convertHandler?.();
+  });
+}
+
+/**
+ * PDF 변환 버튼 클릭 핸들러를 등록한다.
+ * main.ts에서 converter.ts의 convertPdf를 래핑해서 전달한다.
+ */
+export function setConvertHandler(handler: () => void): void {
+  convertHandler = handler;
+}
+
+/**
+ * 변환 진행 중 상태를 토글한다.
+ * true → 버튼 비활성화 + "변환 중…" 표시
+ */
+export function setConverting(active: boolean): void {
+  const btn = document.getElementById("pdf-convert-btn") as HTMLButtonElement | null;
+  if (!btn) return;
+  btn.disabled = active;
+  btn.textContent = active ? "변환 중…" : "변환";
 }
 
 /** File 객체로 PDF를 로드한다. */

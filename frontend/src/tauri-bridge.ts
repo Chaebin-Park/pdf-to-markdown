@@ -80,3 +80,20 @@ export function onInstallProgress(
 export function onInstallLog(cb: (line: string) => void): Promise<UnlistenFn> {
   return listen<string>("hybrid-install-log", (e) => cb(e.payload));
 }
+
+// ---------------------------------------------------------------------------
+// File utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * PDF 바이트 배열을 시스템 임시 디렉터리에 저장하고 절대 경로를 반환한다.
+ * Ktor 서버에 filePath를 전달할 때 사용한다.
+ */
+export function saveTempPdf(data: Uint8Array): Promise<string> {
+  return invoke<string>("save_temp_pdf", { data: Array.from(data) });
+}
+
+/** 지정 경로의 텍스트 파일 내용을 읽어 반환한다. */
+export function readTextFile(path: string): Promise<string> {
+  return invoke<string>("read_text_file", { path });
+}
