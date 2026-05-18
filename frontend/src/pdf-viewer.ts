@@ -206,7 +206,8 @@ async function rerenderAll(doc: PDFDocumentProxy, version: number): Promise<void
     if (renderVersion !== version) return;
     const pageNum = Number(wrapper.dataset.page);
     const page = await doc.getPage(pageNum);
-    const existing = wrapper.querySelector("canvas")!;
+    const existing = wrapper.querySelector("canvas");
+    if (!existing) continue;
     const newCanvas = buildCanvas(page, pages.clientWidth);
     wrapper.replaceChild(newCanvas, existing);
     await renderPage(page, newCanvas);
@@ -221,23 +222,30 @@ function buildCanvas(page: PDFPageProxy, containerWidth: number): HTMLCanvasElem
   const viewport = page.getViewport({ scale });
 
   const canvas = document.createElement("canvas");
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(viewport.width * dpr);
-  canvas.height = Math.floor(viewport.height * dpr);
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
   canvas.style.width = `${Math.floor(viewport.width)}px`;
   canvas.style.height = `${Math.floor(viewport.height)}px`;
-  // scale 값을 data attribute로 보관 (renderPage에서 사용)
   canvas.dataset.scale = String(scale);
-  canvas.dataset.dpr = String(dpr);
   return canvas;
 }
 
 async function renderPage(page: PDFPageProxy, canvas: HTMLCanvasElement): Promise<void> {
-  const scale = Number(canvas.dataset.scale);
-  const dpr = Number(canvas.dataset.dpr);
-  const viewport = page.getViewport({ scale: scale * dpr });
-  const ctx = canvas.getContext("2d")!;
-  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  try {
+    const scale = Number(canvas.dataset.scale);
+    const viewport = page.getViewport({ scale });
+    const ctx = canvas.getContext("2d")!;
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  } catch (e) {
+    // 렌더링 실패 시 canvas에 오류 메시지를 표시한다.
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#2d2d2d";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ce9178";
+    ctx.font = "13px sans-serif";
+    ctx.fillText(`렌더링 실패: ${e}`, 10, 30);
+  }
 }
 
 // ---------------------------------------------------------------------------
