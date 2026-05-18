@@ -8,6 +8,7 @@ import { convertPdf } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
 import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
 import { readTextFile } from "./tauri-bridge";
+import { maybeShowOnboarding } from "./onboarding";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -56,6 +57,9 @@ function renderApp(root: HTMLDivElement): void {
   // 진행률 바는 레이아웃 컨테이너에 마운트 (두 패널 위에 오버레이)
   const layoutEl = root.querySelector<HTMLElement>(".layout")!;
   mountProgressBar(layoutEl);
+
+  // 최초 실행 시 온보딩 모달 표시
+  maybeShowOnboarding();
 
   setConvertHandler(async () => {
     const buffer = currentPdfBuffer;

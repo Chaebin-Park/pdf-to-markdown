@@ -533,6 +533,118 @@ body,
   margin: 1.2em 0;
 }
 
+/* -------------------------------------------------------------------------
+   Onboarding modal
+   ---------------------------------------------------------------------- */
+
+.ob-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: ob-fade-in 0.2s ease;
+}
+
+.ob-backdrop.ob-closing {
+  animation: ob-fade-out 0.2s ease forwards;
+}
+
+@keyframes ob-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes ob-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.ob-card {
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 28px 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: ob-slide-up 0.22s ease;
+}
+
+@keyframes ob-slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.ob-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8e8e8;
+  margin-bottom: 6px;
+}
+
+.ob-subtitle {
+  font-size: 12px;
+  color: #6b6b6b;
+  margin-bottom: 20px;
+}
+
+.ob-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.ob-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ob-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.ob-step-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c8c8c8;
+  margin-bottom: 2px;
+}
+
+.ob-step-desc {
+  font-size: 12px;
+  color: #7a7a7a;
+  line-height: 1.5;
+}
+
+.ob-start-btn {
+  width: 100%;
+  padding: 9px;
+  background: #4ec9b0;
+  border: none;
+  border-radius: 5px;
+  color: #1e1e1e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ob-start-btn:hover {
+  background: #3db99f;
+}
+
+.ob-start-btn:focus {
+  outline: 2px solid #4ec9b0;
+  outline-offset: 2px;
+}
+
 /* Raw Markdown view */
 .md-raw {
   white-space: pre-wrap;
