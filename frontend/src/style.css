@@ -113,3 +113,120 @@ body,
 .divider:active {
   background: #4ec9b0;
 }
+
+/* -------------------------------------------------------------------------
+   PDF viewer
+   ---------------------------------------------------------------------- */
+
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #252526;
+}
+
+/* Drop zone (no PDF loaded) */
+.pdf-dropzone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #3c3c3c;
+  margin: 16px;
+  border-radius: 6px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pdf-dropzone.drag-over {
+  border-color: #4ec9b0;
+  background: rgba(78, 201, 176, 0.05);
+}
+
+.pdf-dropzone-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #6b6b6b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.pdf-dropzone-inner svg {
+  color: #4b4b4b;
+}
+
+.pdf-open-btn {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #c8c8c8;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pdf-open-btn:hover {
+  background: #2d2d2d;
+  border-color: #4ec9b0;
+  color: #4ec9b0;
+}
+
+/* Toolbar */
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #2d2d2d;
+  background: #1e1e1e;
+  flex-shrink: 0;
+  min-height: 32px;
+}
+
+.pdf-filename {
+  font-size: 12px;
+  color: #c8c8c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.pdf-pagecount {
+  font-size: 11px;
+  color: #6b6b6b;
+  flex-shrink: 0;
+}
+
+/* Pages scroll area */
+.pdf-pages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pdf-page-wrapper {
+  display: flex;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.pdf-page-wrapper canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/* Loading state inside pdf-pages */
+.pdf-loading {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 2rem 0;
+}
