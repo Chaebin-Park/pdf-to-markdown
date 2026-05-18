@@ -1,5 +1,6 @@
 import "./style.css";
 import { getServerPort, onServerReady } from "./tauri-bridge";
+import { mountLayout } from "./layout";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -15,7 +16,7 @@ async function init() {
   const existingPort = await getServerPort();
   if (existingPort != null) {
     serverBaseUrl = `http://localhost:${existingPort}`;
-    renderReady(root);
+    renderApp(root);
     return;
   }
 
@@ -23,7 +24,7 @@ async function init() {
   const unlisten = await onServerReady((port) => {
     serverBaseUrl = `http://localhost:${port}`;
     unlisten();
-    renderReady(root);
+    renderApp(root);
   });
 }
 
@@ -40,13 +41,10 @@ function renderLoading(root: HTMLDivElement): void {
   `;
 }
 
-function renderReady(root: HTMLDivElement): void {
-  // TODO(3-3): 스플래시를 메인 레이아웃으로 교체한다.
-  root.innerHTML = `
-    <div class="splash">
-      <p class="splash-label ready">준비 완료 — ${serverBaseUrl}</p>
-    </div>
-  `;
+function renderApp(root: HTMLDivElement): void {
+  mountLayout(root);
+  // TODO(3-4): 좌측 패널에 PDF.js 뷰어 마운트
+  // TODO(3-5): 우측 패널에 Markdown 렌더러 마운트
 }
 
 init();

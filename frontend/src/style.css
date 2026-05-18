@@ -37,10 +37,6 @@ body,
   letter-spacing: 0.03em;
 }
 
-.splash-label.ready {
-  color: #4ec9b0;
-}
-
 /* 세 개의 점이 순서대로 페이드인/아웃되는 애니메이션 */
 .splash-dots {
   display: flex;
@@ -65,7 +61,9 @@ body,
 }
 
 @keyframes dot-pulse {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     opacity: 0.2;
     transform: scale(0.85);
   }
@@ -73,4 +71,45 @@ body,
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* -------------------------------------------------------------------------
+   2-panel split layout
+   ---------------------------------------------------------------------- */
+
+.layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.panel {
+  height: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* flex-grow:1 은 panel-right 에만 — 나머지 공간을 모두 차지 */
+.panel-right {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 리사이저 막대 */
+.divider {
+  width: 4px;
+  flex: 0 0 4px;
+  height: 100%;
+  background: #2d2d2d;
+  cursor: col-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+
+.divider:hover,
+.divider:active {
+  background: #4ec9b0;
 }
