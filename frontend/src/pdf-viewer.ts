@@ -11,6 +11,7 @@
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
+import { isDoclingReady } from "./docling-state";
 
 // public/pdf.worker.min.mjs 를 직접 참조한다.
 // npm install 후 postinstall 스크립트로 복사되며,
@@ -68,6 +69,7 @@ export function mountPdfViewer(container: HTMLElement): void {
           <option value="OCR">OCR</option>
           <option value="FORMULA">Formula</option>
         </select>
+        <span class="pdf-mode-warning" id="pdf-mode-warning" style="display:none" title="docling-serve가 준비되지 않았습니다. 설정에서 Hybrid 모드를 설치하세요.">⚠</span>
         <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
         <button class="pdf-bbox-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
       </div>
@@ -77,6 +79,7 @@ export function mountPdfViewer(container: HTMLElement): void {
 
   registerDragAndDrop(container);
   registerFileInput(container);
+  registerModeWarning();
 
   document.getElementById("pdf-convert-btn")?.addEventListener("click", () => {
     convertHandler?.();
@@ -285,4 +288,22 @@ function registerFileInput(container: HTMLElement): void {
 /** MIME 타입 또는 확장자로 PDF 파일 여부를 판정한다. */
 function isPdf(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+/**
+ * 모드 선택 변경 시 docling-serve가 준비되지 않은 상태에서
+ * Hybrid / OCR / Formula 모드를 선택하면 경고 아이콘을 표시한다.
+ */
+function registerModeWarning(): void {
+  const select = document.getElementById("pdf-mode-select") as HTMLSelectElement | null;
+  const warning = document.getElementById("pdf-mode-warning") as HTMLElement | null;
+  if (!select || !warning) return;
+
+  const update = () => {
+    const needsDocling = select.value !== "STANDARD";
+    const notReady = needsDocling && !isDoclingReady();
+    warning.style.display = notReady ? "inline" : "none";
+  };
+
+  select.addEventListener("change", update);
 }

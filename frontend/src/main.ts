@@ -1,15 +1,18 @@
 import "./style.css";
 import "highlight.js/styles/github-dark.css";
-import { getServerPort, onServerReady } from "./tauri-bridge";
+import {
+  getServerPort, onServerReady, readTextFile,
+  checkHybridInstalled, startDoclingServe, onDoclingReady, getDoclingPort,
+} from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
 import { mountPdfViewer, setConvertHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
 import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown, setHelpHandler, setSettingsHandler } from "./markdown-renderer";
 import { convertPdf } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
 import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
-import { readTextFile } from "./tauri-bridge";
 import { maybeShowOnboarding, showOnboarding } from "./onboarding";
 import { showSettings } from "./settings";
+import { setDoclingReady } from "./docling-state";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -20,6 +23,9 @@ export let serverBaseUrl: string | null = null;
 async function init() {
   const root = document.querySelector<HTMLDivElement>("#app")!;
   renderLoading(root);
+
+  // docling-serve 자동 시작: Ktor 서버와 병렬로 처리한다.
+  initDocling();
 
   // 앱 재시작 없이 핫리로드된 경우 서버가 이미 기동 중일 수 있으므로 먼저 조회한다.
   const existingPort = await getServerPort();
@@ -35,6 +41,35 @@ async function init() {
     unlisten();
     renderApp(root);
   });
+}
+
+/**
+ * Hybrid 모드 설치 여부를 확인하고, 설치돼 있으면 docling-serve를 자동 시작한다.
+ * Ktor 서버 초기화와 병렬로 실행되므로 await하지 않는다.
+ */
+async function initDocling(): Promise<void> {
+  try {
+    // 핫리로드 등으로 이미 기동된 경우 포트가 반환된다.
+    const existingPort = await getDoclingPort();
+    if (existingPort != null) {
+      setDoclingReady(true);
+      return;
+    }
+
+    const installed = await checkHybridInstalled();
+    if (!installed) return;
+
+    // 준비 완료 이벤트를 먼저 구독한 뒤 시작 명령을 보낸다.
+    const unlisten = await onDoclingReady(() => {
+      setDoclingReady(true);
+      unlisten();
+    });
+
+    await startDoclingServe();
+  } catch (e) {
+    // docling 시작 실패는 치명적이지 않으므로 콘솔에만 기록한다.
+    console.warn("[docling] 자동 시작 실패:", e);
+  }
 }
 
 function renderLoading(root: HTMLDivElement): void {
