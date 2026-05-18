@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# pdfjs worker — postinstall 스크립트로 생성됨 (node_modules에서 복사)
+public/pdf.worker.min.mjs
 *.local
 
 # Editor directories and files

@@ -11,10 +11,12 @@
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
-// ?url import: Vite가 dev/prod 모두에서 올바른 URL로 변환한다
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+// public/pdf.worker.min.mjs 를 직접 참조한다.
+// npm install 후 postinstall 스크립트로 복사되며,
+// dev(http://localhost:1420/pdf.worker.min.mjs)와
+// prod(tauri://localhost/pdf.worker.min.mjs) 모두 동일 경로로 접근 가능하다.
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 /** 현재 로드된 PDF 파일명. 외부에서 참조 가능. */
 export let currentPdfName: string | null = null;
