@@ -34,7 +34,10 @@ fun main() {
 fun Application.module() {
     install(ContentNegotiation) { json() }
     install(CORS) {
-        allowHost("localhost", schemes = listOf("http", "https", "tauri"))
+        // 로컬 전용 데스크탑 앱이므로 모든 호스트 허용.
+        // WebView origin이 dev(http://localhost:1420)와 prod(tauri://localhost)에서 다르므로
+        // 포트별 개별 등록 대신 anyHost()를 사용한다.
+        anyHost()
         allowHeader(HttpHeaders.ContentType)
         allowMethod(HttpMethod.Post)
     }

@@ -11,12 +11,10 @@
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
+// ?url import: Vite가 dev/prod 모두에서 올바른 URL로 변환한다
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// PDF.js 워커 설정 (Vite import.meta.url 방식)
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).href;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 /** 현재 로드된 PDF 파일명. 외부에서 참조 가능. */
 export let currentPdfName: string | null = null;
@@ -260,7 +258,7 @@ function registerDragAndDrop(container: HTMLElement): void {
     e.preventDefault();
     container.querySelector(".pdf-dropzone")?.classList.remove("drag-over");
     const file = e.dataTransfer?.files[0];
-    if (file?.type === "application/pdf") loadPdf(file);
+    if (file && isPdf(file)) loadPdf(file);
   });
 }
 
@@ -268,7 +266,12 @@ function registerFileInput(container: HTMLElement): void {
   const input = container.querySelector<HTMLInputElement>("#pdf-file-input")!;
   input.addEventListener("change", () => {
     const file = input.files?.[0];
-    if (file) loadPdf(file);
+    if (file && isPdf(file)) loadPdf(file);
     input.value = "";
   });
+}
+
+/** MIME 타입 또는 확장자로 PDF 파일 여부를 판정한다. */
+function isPdf(file: File): boolean {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
