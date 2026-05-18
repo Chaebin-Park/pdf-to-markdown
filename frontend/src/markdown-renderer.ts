@@ -58,6 +58,7 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
         <button class="md-btn" id="${ID.copyBtn}" title="클립보드에 복사">Copy</button>
       </div>
       <div class="md-help-bar">
+        <button class="md-settings-btn" id="md-settings-btn" title="설정">⚙</button>
         <button class="md-help-btn" id="md-help-btn" title="사용 방법 보기">?</button>
       </div>
       <div class="md-placeholder" id="${ID.placeholder}">
@@ -74,6 +75,11 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
 /** 도움말(?) 버튼 클릭 핸들러를 등록한다. main.ts에서 showOnboarding을 연결한다. */
 export function setHelpHandler(cb: () => void): void {
   document.getElementById("md-help-btn")?.addEventListener("click", cb);
+}
+
+/** 설정(⚙) 버튼 클릭 핸들러를 등록한다. main.ts에서 showSettings를 연결한다. */
+export function setSettingsHandler(cb: () => void): void {
+  document.getElementById("md-settings-btn")?.addEventListener("click", cb);
 }
 
 /**

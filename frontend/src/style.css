@@ -724,3 +724,213 @@ body,
   color: #9cdcfe;
   line-height: 1.6;
 }
+
+/* -------------------------------------------------------------------------
+   Settings button (⚙) in help-bar
+   ---------------------------------------------------------------------- */
+
+.md-settings-btn {
+  background: transparent;
+  border: none;
+  color: #6b6b6b;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.12s, background 0.12s;
+}
+
+.md-settings-btn:hover {
+  color: #c8c8c8;
+  background: #2d2d2d;
+}
+
+/* -------------------------------------------------------------------------
+   Settings modal
+   ---------------------------------------------------------------------- */
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: settings-fade-in 0.15s ease;
+}
+
+.settings-backdrop.settings-closing {
+  animation: settings-fade-out 0.18s ease forwards;
+}
+
+@keyframes settings-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes settings-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.settings-card {
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 0;
+  width: 420px;
+  max-width: 92vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: ob-slide-up 0.22s ease;
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.settings-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8e8;
+}
+
+.settings-close-btn {
+  background: transparent;
+  border: none;
+  color: #6b6b6b;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.12s, background 0.12s;
+}
+
+.settings-close-btn:hover {
+  color: #c8c8c8;
+  background: #3c3c3c;
+}
+
+.settings-section {
+  padding: 18px 20px 20px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.settings-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c8c8c8;
+}
+
+.settings-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.badge-on {
+  background: #1e3a2e;
+  color: #4ec9b0;
+  border: 1px solid #2d5a45;
+}
+
+.badge-off {
+  background: #2d2020;
+  color: #f48771;
+  border: 1px solid #5a2d2d;
+}
+
+.settings-section-desc {
+  font-size: 12px;
+  color: #7a7a7a;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.settings-install-area {
+  margin-bottom: 4px;
+}
+
+.settings-install-btn {
+  padding: 7px 18px;
+  background: #4ec9b0;
+  border: none;
+  border-radius: 5px;
+  color: #1e1e1e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.settings-install-btn:hover:not(:disabled) {
+  background: #3db99f;
+}
+
+.settings-install-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-installed-text {
+  font-size: 12px;
+  color: #4ec9b0;
+}
+
+/* Progress area */
+.settings-progress-area {
+  margin-top: 12px;
+}
+
+.settings-progress-bar-track {
+  height: 4px;
+  background: #3c3c3c;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.settings-progress-bar-fill {
+  height: 100%;
+  background: #4ec9b0;
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.settings-progress-label {
+  font-size: 11px;
+  color: #9cdcfe;
+  margin-bottom: 8px;
+}
+
+.settings-log-box {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px 10px;
+  max-height: 140px;
+  overflow-y: auto;
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  font-size: 11px;
+}
+
+.settings-log-line {
+  color: #7a7a7a;
+  line-height: 1.5;
+  word-break: break-all;
+}
