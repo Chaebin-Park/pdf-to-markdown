@@ -10,6 +10,7 @@
 
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
+import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
 
 // PDF.js 워커 설정 (Vite import.meta.url 방식)
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -62,6 +63,7 @@ export function mountPdfViewer(container: HTMLElement): void {
         <span class="pdf-filename" id="pdf-filename"></span>
         <span class="pdf-pagecount" id="pdf-pagecount"></span>
         <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
+        <button class="pdf-bbox-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
       </div>
       <div class="pdf-pages" id="pdf-pages" style="display:none"></div>
     </div>
@@ -81,6 +83,23 @@ export function mountPdfViewer(container: HTMLElement): void {
  */
 export function setConvertHandler(handler: () => void): void {
   convertHandler = handler;
+}
+
+/**
+ * BBox 버튼을 표시/숨기고 토글 핸들러를 연결한다.
+ * 변환 완료 후 jsonPath가 있으면 main.ts에서 호출한다.
+ */
+export function setBBoxAvailable(available: boolean, onToggle?: () => void): void {
+  const btn = document.getElementById("pdf-bbox-btn") as HTMLButtonElement | null;
+  if (!btn) return;
+  btn.style.display = available ? "inline-block" : "none";
+  if (available && onToggle) {
+    btn.onclick = () => {
+      const active = btn.classList.toggle("active");
+      btn.textContent = active ? "BBox ON" : "BBox";
+      onToggle();
+    };
+  }
 }
 
 /**
@@ -111,6 +130,8 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   // 이전 PDF 정리
   pdfDoc?.destroy();
   pdfDoc = null;
+  clearBBox();
+  setBBoxAvailable(false);
 
   const viewerEl = document.getElementById("pdf-viewer")!;
   const dropzone = document.getElementById("pdf-dropzone") as HTMLElement;
@@ -178,6 +199,8 @@ async function rerenderAll(doc: PDFDocumentProxy, version: number): Promise<void
     wrapper.replaceChild(newCanvas, existing);
     await renderPage(page, newCanvas);
   }
+  // 리사이즈 후 bbox 오버레이 좌표 재계산
+  refreshBBoxOverlay();
 }
 
 function buildCanvas(page: PDFPageProxy, containerWidth: number): HTMLCanvasElement {

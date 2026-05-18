@@ -1,0 +1,205 @@
+/**
+ * bbox-overlay.ts
+ *
+ * opendataloader-pdf JSON 출력의 bounding box를 PDF 페이지 캔버스 위에 오버레이한다.
+ *
+ * JSON 구조:
+ *   { "file name", "number of pages", "kids": [ element, ... ] }
+ *
+ * 각 element:
+ *   { "type", "page number", "bounding box": [leftX, bottomY, rightX, topY],
+ *     "content"?, "kids"?, "rows"?, "cells"?, "list items"? }
+ *
+ * 좌표계 변환:
+ *   PDF 좌표계는 좌하단 원점 (Y 증가 방향 = 위쪽).
+ *   Canvas/CSS는 좌상단 원점이므로 Y = pageH - topY 로 반전한다.
+ */
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface RawElement {
+  type?: string;
+  "page number"?: number;
+  "bounding box"?: [number, number, number, number];
+  content?: string;
+  kids?: RawElement[];
+  rows?: RawElement[];
+  cells?: RawElement[];
+  "list items"?: RawElement[];
+}
+
+interface BBoxItem {
+  type: string;
+  pageNumber: number;
+  bbox: [number, number, number, number]; // [leftX, bottomY, rightX, topY]
+  content: string;
+}
+
+// ---------------------------------------------------------------------------
+// Color map (type → fill color, border is same at higher opacity)
+// ---------------------------------------------------------------------------
+
+const TYPE_FILL: Record<string, string> = {
+  paragraph: "rgba(78,201,176,0.18)",
+  heading: "rgba(255,200,50,0.22)",
+  table: "rgba(200,100,255,0.18)",
+  "table row": "rgba(180,80,240,0.1)",
+  "table cell": "rgba(160,60,220,0.08)",
+  list: "rgba(100,180,255,0.18)",
+  "list item": "rgba(80,160,235,0.1)",
+  image: "rgba(255,150,100,0.22)",
+  formula: "rgba(255,100,150,0.22)",
+  "text chunk": "rgba(200,200,200,0.08)",
+};
+const DEFAULT_FILL = "rgba(200,200,200,0.1)";
+
+// ---------------------------------------------------------------------------
+// Internal state
+// ---------------------------------------------------------------------------
+
+let items: BBoxItem[] = [];
+let visible = false;
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * opendataloader-pdf JSON 문자열을 파싱하여 내부 bbox 목록을 구성한다.
+ * 파싱 완료 후 현재 visible 상태이면 즉시 렌더링한다.
+ */
+export function parseBBoxJson(json: string): void {
+  items = [];
+  try {
+    const doc = JSON.parse(json);
+    extractItems(doc.kids ?? []);
+  } catch (e) {
+    console.warn("bbox JSON 파싱 실패:", e);
+  }
+  if (visible) renderOverlays();
+}
+
+/** 오버레이를 표시한다. */
+export function showBBoxOverlay(): void {
+  visible = true;
+  renderOverlays();
+}
+
+/** 오버레이를 숨긴다. */
+export function hideBBoxOverlay(): void {
+  visible = false;
+  clearOverlays();
+}
+
+/** 오버레이 토글. 현재 가시성의 반전값을 반환한다. */
+export function toggleBBoxOverlay(): boolean {
+  visible ? hideBBoxOverlay() : showBBoxOverlay();
+  return visible;
+}
+
+/** PDF 재렌더링 후 오버레이를 갱신한다 (ResizeObserver 콜백 등에서 사용). */
+export function refreshBBoxOverlay(): void {
+  if (visible) renderOverlays();
+}
+
+/** 모든 bbox 데이터와 오버레이를 초기화한다. */
+export function clearBBox(): void {
+  items = [];
+  visible = false;
+  clearOverlays();
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function renderOverlays(): void {
+  clearOverlays();
+  if (!visible || items.length === 0) return;
+
+  // 페이지별로 그룹화
+  const byPage = new Map<number, BBoxItem[]>();
+  for (const item of items) {
+    const list = byPage.get(item.pageNumber) ?? [];
+    list.push(item);
+    byPage.set(item.pageNumber, list);
+  }
+
+  const wrappers = document.querySelectorAll<HTMLDivElement>(".pdf-page-wrapper");
+  for (const wrapper of Array.from(wrappers)) {
+    const pageNum = Number(wrapper.dataset.page);
+    const pageItems = byPage.get(pageNum);
+    if (!pageItems?.length) continue;
+
+    const canvas = wrapper.querySelector<HTMLCanvasElement>("canvas");
+    if (!canvas) continue;
+
+    // CSS 픽셀 기준 캔버스 크기
+    const canvasW = parseFloat(canvas.style.width);
+    const canvasH = parseFloat(canvas.style.height);
+    const scale = Number(canvas.dataset.scale);
+    if (!scale || !canvasW || !canvasH) continue;
+
+    // PDF 포인트 단위 페이지 크기
+    const pageW = canvasW / scale;
+    const pageH = canvasH / scale;
+
+    const layer = document.createElement("div");
+    layer.className = "bbox-layer";
+    layer.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;pointer-events:none;`;
+
+    for (const item of pageItems) {
+      const [lx, by, rx, ty] = item.bbox;
+      const x = (lx / pageW) * canvasW;
+      const y = ((pageH - ty) / pageH) * canvasH; // Y 반전
+      const w = ((rx - lx) / pageW) * canvasW;
+      const h = ((ty - by) / pageH) * canvasH;
+      if (w <= 0 || h <= 0) continue;
+
+      const fill = TYPE_FILL[item.type] ?? DEFAULT_FILL;
+      const border = fill.replace(/[\d.]+\)$/, "0.55)");
+
+      const rect = document.createElement("div");
+      rect.className = "bbox-rect";
+      rect.dataset.bboxType = item.type;
+      rect.title = `[${item.type}] ${item.content.slice(0, 120)}`;
+      rect.style.cssText = `
+        position:absolute;
+        left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;
+        width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;
+        background:${fill};border:1px solid ${border};
+        box-sizing:border-box;pointer-events:auto;cursor:default;
+      `;
+      layer.appendChild(rect);
+    }
+
+    wrapper.appendChild(layer);
+  }
+}
+
+function clearOverlays(): void {
+  document.querySelectorAll(".bbox-layer").forEach((el) => el.remove());
+}
+
+// ---------------------------------------------------------------------------
+// JSON traversal (recursive)
+// ---------------------------------------------------------------------------
+
+function extractItems(elements: RawElement[]): void {
+  for (const el of elements) {
+    if (el["bounding box"]) {
+      items.push({
+        type: el.type ?? "unknown",
+        pageNumber: el["page number"] ?? 1,
+        bbox: el["bounding box"]!,
+        content: el.content ?? el.type ?? "",
+      });
+    }
+    if (el.kids) extractItems(el.kids);
+    if (el.rows) extractItems(el.rows);
+    if (el.cells) extractItems(el.cells);
+    if (el["list items"]) extractItems(el["list items"]);
+  }
+}
