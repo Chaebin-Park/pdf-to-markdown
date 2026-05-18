@@ -156,7 +156,6 @@ async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
             "--python",
             venv_dir.to_str().unwrap(),
             "opendataloader-pdf[hybrid]",
-            "docling-serve",
         ])
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -269,19 +268,19 @@ fn start_docling_serve(
         .join("opendataloader");
 
     #[cfg(target_os = "windows")]
-    let docling_bin = cache_dir.join("venv").join("Scripts").join("docling-serve.exe");
+    let docling_bin = cache_dir.join("venv").join("Scripts").join("opendataloader-pdf-hybrid.exe");
     #[cfg(not(target_os = "windows"))]
-    let docling_bin = cache_dir.join("venv").join("bin").join("docling-serve");
+    let docling_bin = cache_dir.join("venv").join("bin").join("opendataloader-pdf-hybrid");
 
     if !docling_bin.exists() {
         return Err(
-            "docling-serve 실행 파일을 찾을 수 없습니다. install_hybrid를 먼저 실행해 주세요."
+            "opendataloader-pdf-hybrid 실행 파일을 찾을 수 없습니다. install_hybrid를 먼저 실행해 주세요."
                 .to_string(),
         );
     }
 
     let child = Command::new(&docling_bin)
-        .args(["run", "--host", "127.0.0.1", "--port", &DOCLING_PORT.to_string()])
+        .args(["--host", "127.0.0.1", "--port", &DOCLING_PORT.to_string()])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
