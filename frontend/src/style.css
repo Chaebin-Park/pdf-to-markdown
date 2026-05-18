@@ -82,6 +82,7 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
+  position: relative; /* progress-overlay 기준점 */
 }
 
 .panel {
@@ -252,6 +253,45 @@ body,
   justify-content: center;
   gap: 6px;
   padding: 2rem 0;
+}
+
+/* -------------------------------------------------------------------------
+   Progress bar overlay
+   ---------------------------------------------------------------------- */
+
+.progress-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #1e1e1e;
+  border-top: 1px solid #2d2d2d;
+  padding: 4px 10px 6px;
+}
+
+.progress-track {
+  height: 3px;
+  background: #2d2d2d;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4ec9b0;
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-label {
+  font-size: 11px;
+  color: #6b6b6b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* -------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
 import { mountPdfViewer, setConvertHandler, setConverting, currentPdfBuffer } from "./pdf-viewer";
 import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
 import { convertPdf } from "./converter";
+import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -50,6 +51,10 @@ function renderApp(root: HTMLDivElement): void {
   mountPdfViewer(getPanelLeft());
   mountMarkdownRenderer(getPanelRight());
 
+  // 진행률 바는 레이아웃 컨테이너에 마운트 (두 패널 위에 오버레이)
+  const layoutEl = root.querySelector<HTMLElement>(".layout")!;
+  mountProgressBar(layoutEl);
+
   setConvertHandler(async () => {
     const buffer = currentPdfBuffer;
     if (!buffer) return;
@@ -59,15 +64,17 @@ function renderApp(root: HTMLDivElement): void {
     setStreaming(true);
 
     await convertPdf(buffer, "STANDARD", {
-      onProgress: (_event) => {
-        // TODO(3-7): 진행률 바 업데이트
+      onProgress: (event) => {
+        updateProgress({ percent: event.percent, label: event.label, eta: event.eta });
       },
       onComplete: (markdown, _jsonPath) => {
+        hideProgress();
         setStreaming(false);
         setMarkdown(markdown);
         setConverting(false);
       },
       onError: (message) => {
+        hideProgress();
         setStreaming(false);
         setMarkdown(`> **오류**: ${message}`);
         setConverting(false);
