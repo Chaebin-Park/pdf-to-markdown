@@ -294,16 +294,25 @@ function isPdf(file: File): boolean {
  * 모드 선택 변경 시 docling-serve가 준비되지 않은 상태에서
  * Hybrid / OCR / Formula 모드를 선택하면 경고 아이콘을 표시한다.
  */
+const MODE_STORAGE_KEY = "convertMode";
+
 function registerModeWarning(): void {
   const select = document.getElementById("pdf-mode-select") as HTMLSelectElement | null;
   const warning = document.getElementById("pdf-mode-warning") as HTMLElement | null;
   if (!select || !warning) return;
 
+  // 마지막으로 선택한 모드 복원
+  const saved = localStorage.getItem(MODE_STORAGE_KEY);
+  if (saved) select.value = saved;
+
   const update = () => {
+    localStorage.setItem(MODE_STORAGE_KEY, select.value);
     const needsDocling = select.value !== "STANDARD";
     const notReady = needsDocling && !isDoclingReady();
     warning.style.display = notReady ? "inline" : "none";
   };
 
   select.addEventListener("change", update);
+  // 복원된 값으로 경고 초기 상태 설정
+  update();
 }
