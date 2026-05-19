@@ -460,7 +460,22 @@ pub fn run() {
             #[cfg(not(target_os = "windows"))]
             let bundled_java: Option<std::path::PathBuf> = None;
 
+            // 진단 정보 수집
+            let bundled_jre_display = bundled_java.as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "N/A".to_string());
+            let bundled_jre_exists = bundled_java.as_ref().map(|p| p.exists()).unwrap_or(false);
+            let resource_dir = app.path()
+                .resolve(".", tauri::path::BaseDirectory::Resource)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "조회 실패".to_string());
+
             let java = find_java(bundled_java);
+            let java_display = java.display().to_string();
+
+            log::info!("[진단] 리소스 디렉토리: {resource_dir}");
+            log::info!("[진단] 번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})");
+            log::info!("[진단] 선택된 java: {java_display}");
             log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
             let mut child = Command::new(&java)
                 .arg("-jar")
@@ -505,12 +520,16 @@ pub fn run() {
                         let _ = app_handle.emit("server-ready", port);
                         log::info!("Ktor server ready on port {port}");
                     } else {
-                        let msg = "Ktor server did not become ready in time";
+                        let msg = format!(
+                            "서버 포트 응답 없음.\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}"
+                        );
                         log::error!("{msg}");
                         let _ = app_handle.emit("server-error", msg);
                     }
                 } else {
-                    let msg = "서버 시작 타임아웃. Java 21이 설치되어 있는지 확인해주세요. (java.com 또는 adoptium.net에서 다운로드)";
+                    let msg = format!(
+                        "서버 시작 타임아웃 (60초).\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}"
+                    );
                     log::error!("{msg}");
                     let _ = app_handle.emit("server-error", msg);
                 }
