@@ -182,7 +182,7 @@ jobs:
           ALL=$(echo "$DETECTED,$ESSENTIAL" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
           echo "포함 모듈: $ALL"
 
-          mkdir -p src-tauri/resources/jre
+          rm -rf src-tauri/resources/jre
           "$JAVA_HOME_PATH/bin/jlink" \
             --add-modules "$ALL" \
             --strip-debug \
