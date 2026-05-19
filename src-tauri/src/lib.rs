@@ -139,6 +139,7 @@ async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
             venv_dir.to_str().unwrap(),
             "--python",
             "3.11",
+            "--clear", // 중단된 설치로 venv가 불완전하게 존재할 경우 재생성
         ])
         .status()
         .map_err(|e| format!("가상 환경 생성 실패: {e}"))?;
@@ -277,6 +278,15 @@ fn start_docling_serve(
             "opendataloader-pdf-hybrid 실행 파일을 찾을 수 없습니다. install_hybrid를 먼저 실행해 주세요."
                 .to_string(),
         );
+    }
+
+    // 앱 강제 종료 후 좀비 프로세스가 포트를 점유하고 있을 수 있음.
+    // 포트가 이미 열려있으면 기존 프로세스를 재활용하고 새 프로세스를 시작하지 않는다.
+    if wait_for_server(DOCLING_PORT, 2) {
+        *docling_state.port.lock().unwrap() = Some(DOCLING_PORT);
+        let _ = app.emit("docling-ready", DOCLING_PORT);
+        log::info!("docling-serve already running on port {DOCLING_PORT}, reusing");
+        return Ok(());
     }
 
     let child = Command::new(&docling_bin)
