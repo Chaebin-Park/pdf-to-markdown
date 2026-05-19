@@ -13,6 +13,7 @@ import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
 import { maybeShowOnboarding, showOnboarding } from "./onboarding";
 import { showSettings } from "./settings";
 import { setDoclingReady } from "./docling-state";
+import { checkForUpdates } from "./updater";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -98,6 +99,7 @@ function renderApp(root: HTMLDivElement): void {
   setHelpHandler(() => showOnboarding());
   setSettingsHandler(() => showSettings());
   maybeShowOnboarding();
+  checkForUpdates();
 
   setConvertHandler(async () => {
     const buffer = currentPdfBuffer;

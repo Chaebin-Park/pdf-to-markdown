@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "notes": "Initial release",
+  "pub_date": "2026-05-19T00:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWE9IK0hHVmpzK1dEQzFUOXNGMDRDcGFIRFZ6djhyWVIzb2dqWEw5dk5BTGZhRldmaVdqbHdxYnJKaXRVSkVZZkJUYWhsb2pqNHpGSkwrRDdFek1seEx0eTg5bWJtc2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MTkwMDk1CWZpbGU6cGRmLXRvLW1hcmtkb3duLmFwcC50YXIuZ3oKSEhJZC9Da0UvR3B5Z1NNVlVjM1g4NjdnODZQUHd2TUhMZDkyK3RmTDFtOWxuSWlaN0FsTkVoU3J5TTJyR2hvSFp3QzlqS1d5RjZKT2VYOER2T3A5REE9PQo=",
+      "url": "https://github.com/Chaebin-Park/pdf-to-markdown/releases/download/v0.1.0/pdf-to-markdown.app.tar.gz"
+    }
+  }
+}
