@@ -395,7 +395,7 @@ pub fn run() {
                 .arg("-jar")
                 .arg(&jar_path)
                 .stdout(Stdio::piped())
-                .stderr(Stdio::null())
+                .stderr(Stdio::piped())
                 .spawn()?;
 
             // stdout에서 PORT= 줄을 읽는 스레드 (나머지 줄은 drain해서 파이프 막힘 방지)
@@ -409,6 +409,14 @@ pub fn run() {
                             let _ = tx.send(port);
                         }
                     }
+                }
+            });
+
+            // stderr를 로그로 출력 (서버 시작 실패 원인 파악용)
+            let stderr = child.stderr.take().expect("stderr not captured");
+            thread::spawn(move || {
+                for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                    log::warn!("[server.jar] {line}");
                 }
             });
 
@@ -426,10 +434,14 @@ pub fn run() {
                         let _ = app_handle.emit("server-ready", port);
                         log::info!("Ktor server ready on port {port}");
                     } else {
-                        log::error!("Ktor server did not become ready in time");
+                        let msg = "Ktor server did not become ready in time";
+                        log::error!("{msg}");
+                        let _ = app_handle.emit("server-error", msg);
                     }
                 } else {
-                    log::error!("Timed out waiting for PORT= from Ktor server");
+                    let msg = "Timed out waiting for PORT= from Ktor server. Java가 설치되지 않았거나 server.jar 실행에 실패했을 수 있습니다.";
+                    log::error!("{msg}");
+                    let _ = app_handle.emit("server-error", msg);
                 }
             });
 

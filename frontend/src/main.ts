@@ -1,7 +1,7 @@
 import "./style.css";
 import "highlight.js/styles/github-dark.css";
 import {
-  getServerPort, onServerReady, readTextFile,
+  getServerPort, onServerReady, onServerError, readTextFile,
   checkHybridInstalled, startDoclingServe, onDoclingReady, getDoclingPort,
 } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
@@ -40,7 +40,13 @@ async function init() {
   const unlisten = await onServerReady((port) => {
     serverBaseUrl = `http://localhost:${port}`;
     unlisten();
+    unlistenErr();
     renderApp(root);
+  });
+
+  const unlistenErr = await onServerError((message) => {
+    unlistenErr();
+    renderServerError(root, message);
   });
 }
 
@@ -71,6 +77,16 @@ async function initDocling(): Promise<void> {
     // docling 시작 실패는 치명적이지 않으므로 콘솔에만 기록한다.
     console.warn("[docling] 자동 시작 실패:", e);
   }
+}
+
+function renderServerError(root: HTMLDivElement, message: string): void {
+  root.innerHTML = `
+    <div class="splash">
+      <p class="splash-label" style="color:#f87171;">서버 시작 실패</p>
+      <p style="font-size:12px;color:#9ca3af;max-width:400px;text-align:center;margin-top:8px;">${message}</p>
+      <p style="font-size:11px;color:#6b7280;margin-top:16px;">콘솔(F12)에서 상세 로그를 확인하세요.</p>
+    </div>
+  `;
 }
 
 function renderLoading(root: HTMLDivElement): void {

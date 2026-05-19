@@ -69,6 +69,11 @@ export function onServerReady(cb: (port: number) => void): Promise<UnlistenFn> {
   return listen<number>("server-ready", (e) => cb(e.payload));
 }
 
+/** Ktor 서버 시작 실패. 페이로드: 에러 메시지. */
+export function onServerError(cb: (message: string) => void): Promise<UnlistenFn> {
+  return listen<string>("server-error", (e) => cb(e.payload));
+}
+
 /** Docling 서버 준비 완료. 페이로드: 포트 번호. */
 export function onDoclingReady(cb: (port: number) => void): Promise<UnlistenFn> {
   return listen<number>("docling-ready", (e) => cb(e.payload));
