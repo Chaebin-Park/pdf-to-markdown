@@ -347,6 +347,14 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("파일 읽기 실패 ({path}): {e}"))
 }
 
+/// 지정 경로의 파일을 바이너리로 읽어 바이트 배열을 반환한다.
+///
+/// 변환 결과에 포함된 이미지 파일을 Base64로 인라인 임베딩할 때 사용한다.
+#[tauri::command]
+fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|e| format!("파일 읽기 실패 ({path}): {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 프로세스 핸들은 setup 클로저와 run 클로저 양쪽에서 접근하므로 Arc로 공유
@@ -435,7 +443,8 @@ pub fn run() {
             start_docling_serve,
             get_docling_port,
             save_temp_pdf,
-            read_text_file
+            read_text_file,
+            read_binary_file
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

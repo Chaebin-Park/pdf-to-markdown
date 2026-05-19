@@ -102,3 +102,9 @@ export function saveTempPdf(data: Uint8Array): Promise<string> {
 export function readTextFile(path: string): Promise<string> {
   return invoke<string>("read_text_file", { path });
 }
+
+/** 지정 경로의 파일을 바이너리로 읽어 Uint8Array로 반환한다. */
+export async function readBinaryFile(path: string): Promise<Uint8Array> {
+  const bytes = await invoke<number[]>("read_binary_file", { path });
+  return new Uint8Array(bytes);
+}
