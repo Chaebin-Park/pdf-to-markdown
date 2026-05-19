@@ -54,7 +54,7 @@ fn check_hybrid_installed(app: tauri::AppHandle) -> bool {
 /// 번들된 uv 바이너리의 경로를 반환하는 헬퍼.
 ///
 /// 플랫폼과 아키텍처에 따라 리소스 파일명을 선택한다.
-/// 현재 번들: macOS arm64 (`uv-macos-arm64`).
+/// 현재 번들: macOS arm64 (`uv-macos-arm64`), Windows x64 (`uv-windows-x86_64.exe`).
 fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     let name = "uv-macos-arm64";

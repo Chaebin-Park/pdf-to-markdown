@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "../server/app/build/libs/server.jar": "server.jar",
+      "resources/uv-windows-x86_64.exe": "uv-windows-x86_64.exe"
+    }
+  }
+}
