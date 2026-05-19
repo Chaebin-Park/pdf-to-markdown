@@ -218,8 +218,8 @@ jobs:
         run: |
           mkdir -p staging
           BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
-          find "$BUNDLE_DIR" -name "*.msi" -exec cp {} staging/ \;
-          find "$BUNDLE_DIR" -name "*.msi.sig" -exec cp {} staging/ \;
+          find "$BUNDLE_DIR" -name "*.msi" -exec cp {} staging/ \; || true
+          find "$BUNDLE_DIR" -name "*.msi.sig" -exec cp {} staging/ \; || true
           find "$BUNDLE_DIR" -name "*.exe" ! -name "*.sig" -exec cp {} staging/ \; || true
           find "$BUNDLE_DIR" -name "*.exe.sig" -exec cp {} staging/ \; || true
 
