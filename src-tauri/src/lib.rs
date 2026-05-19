@@ -70,6 +70,34 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
         .map_err(|e| e.to_string())
 }
 
+/// `java` 실행 파일 경로를 반환한다.
+///
+/// 우선순위:
+/// 1. `JAVA_HOME` 환경변수 → `$JAVA_HOME/bin/java(.exe)`
+/// 2. `PATH`에서 `java` 검색 (fallback)
+///
+/// Windows GUI 앱은 사용자 셸과 다른 환경을 상속받아 PATH에서 java를 못 찾는 경우가 있으므로
+/// JAVA_HOME을 먼저 확인한다.
+fn find_java() -> std::path::PathBuf {
+    if let Ok(java_home) = std::env::var("JAVA_HOME") {
+        #[cfg(target_os = "windows")]
+        let candidate = std::path::PathBuf::from(&java_home).join("bin").join("java.exe");
+        #[cfg(not(target_os = "windows"))]
+        let candidate = std::path::PathBuf::from(&java_home).join("bin").join("java");
+
+        if candidate.exists() {
+            log::info!("Java found via JAVA_HOME: {}", candidate.display());
+            return candidate;
+        }
+        log::warn!("JAVA_HOME set ({java_home}) but java binary not found there, falling back to PATH");
+    }
+
+    #[cfg(target_os = "windows")]
+    return std::path::PathBuf::from("java.exe");
+    #[cfg(not(target_os = "windows"))]
+    return std::path::PathBuf::from("java");
+}
+
 /// docling-serve 고정 포트.
 const DOCLING_PORT: u16 = 5002;
 
@@ -391,7 +419,9 @@ pub fn run() {
                 .path()
                 .resolve("server.jar", tauri::path::BaseDirectory::Resource)?;
 
-            let mut child = Command::new("java")
+            let java = find_java();
+            log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
+            let mut child = Command::new(&java)
                 .arg("-jar")
                 .arg(&jar_path)
                 .stdout(Stdio::piped())
