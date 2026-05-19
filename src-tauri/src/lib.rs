@@ -79,6 +79,52 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 ///
 /// Windows GUI 앱은 사용자 셸과 다른 환경을 상속받아 PATH에서 java를 못 찾는 경우가 있으므로
 /// JAVA_HOME 및 공통 설치 경로를 먼저 확인한다.
+/// jre.zip 번들을 리소스 디렉토리에 압축 해제한다 (Windows 전용).
+///
+/// 이미 추출되어 있으면 즉시 경로를 반환한다.
+/// 첫 실행 시 PowerShell의 `Expand-Archive`로 jre.zip을 해제한다.
+#[cfg(target_os = "windows")]
+fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    let resource_dir = app.path().resource_dir().ok()?;
+    let java_exe = resource_dir.join("jre").join("bin").join("java.exe");
+
+    if java_exe.exists() {
+        log::info!("번들 JRE 이미 추출됨: {}", java_exe.display());
+        return Some(java_exe);
+    }
+
+    let zip_path = app.path()
+        .resolve("jre.zip", tauri::path::BaseDirectory::Resource)
+        .ok()?;
+
+    if !zip_path.exists() {
+        log::warn!("jre.zip 없음: {}", zip_path.display());
+        return None;
+    }
+
+    log::info!("번들 JRE 압축 해제 중: {} → {}", zip_path.display(), resource_dir.display());
+
+    let status = Command::new("powershell")
+        .args([
+            "-NoProfile", "-NonInteractive", "-Command",
+            &format!(
+                "Expand-Archive -Force '{}' '{}'",
+                zip_path.display(),
+                resource_dir.display()
+            ),
+        ])
+        .status()
+        .ok()?;
+
+    if status.success() && java_exe.exists() {
+        log::info!("번들 JRE 추출 완료: {}", java_exe.display());
+        Some(java_exe)
+    } else {
+        log::error!("번들 JRE 추출 실패 (exit: {:?})", status.code());
+        None
+    }
+}
+
 fn find_java(bundled_java: Option<std::path::PathBuf>) -> std::path::PathBuf {
     // 0. 번들된 JRE (Windows 배포판에 포함)
     if let Some(java) = bundled_java {
@@ -102,18 +148,24 @@ fn find_java(bundled_java: Option<std::path::PathBuf>) -> std::path::PathBuf {
         log::warn!("JAVA_HOME={java_home} 설정됐지만 java 바이너리 없음, 경로 탐색으로 전환");
     }
 
-    // 2. Windows 주요 설치 경로 탐색
+    // 2. Windows 주요 설치 경로 탐색 (Java 21 이상만)
     #[cfg(target_os = "windows")]
     {
         let program_files = std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
-        let vendors = ["Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "BellSoft", "Azul"];
+        let vendors = ["Eclipse Adoptium", "Microsoft", "Amazon Corretto", "BellSoft", "Azul", "Java"];
         for vendor in &vendors {
             let base = std::path::PathBuf::from(&program_files).join(vendor);
             if let Ok(entries) = std::fs::read_dir(&base) {
-                // 하위 디렉토리 중 가장 버전이 높은 것 선택 (내림차순 정렬)
                 let mut dirs: Vec<_> = entries.filter_map(|e| e.ok()).collect();
                 dirs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
                 for entry in dirs {
+                    let name = entry.file_name().to_string_lossy().to_lowercase();
+                    // Java 21 이상만 허용 (jdk-21, jre21, jdk21.0.x, openlogic-openjdk-21 등)
+                    let version_ok = name.contains("21") || name.contains("22") || name.contains("23") || name.contains("24");
+                    if !version_ok {
+                        log::info!("Java 버전 21 미만 스킵: {}", entry.path().display());
+                        continue;
+                    }
                     let candidate = entry.path().join("bin").join("java.exe");
                     if candidate.exists() {
                         log::info!("Java found via path scan: {}", candidate.display());
@@ -452,11 +504,9 @@ pub fn run() {
                 .path()
                 .resolve("server.jar", tauri::path::BaseDirectory::Resource)?;
 
-            // Windows 배포판에 번들된 JRE 경로 (없으면 None → 시스템 Java 탐색)
+            // Windows: jre.zip 번들 압축 해제 후 경로 반환 (이미 해제됐으면 즉시 반환)
             #[cfg(target_os = "windows")]
-            let bundled_java = app.path()
-                .resolve("jre/bin/java.exe", tauri::path::BaseDirectory::Resource)
-                .ok();
+            let bundled_java = ensure_bundled_jre(app.handle());
             #[cfg(not(target_os = "windows"))]
             let bundled_java: Option<std::path::PathBuf> = None;
 

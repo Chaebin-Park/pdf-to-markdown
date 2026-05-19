@@ -182,7 +182,7 @@ jobs:
           ALL=$(echo "$DETECTED,$ESSENTIAL" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
           echo "포함 모듈: $ALL"
 
-          rm -rf src-tauri/resources/jre
+          rm -rf src-tauri/resources/jre src-tauri/resources/jre.zip
           "$JAVA_HOME_PATH/bin/jlink" \
             --add-modules "$ALL" \
             --strip-debug \
@@ -192,6 +192,11 @@ jobs:
             --output src-tauri/resources/jre
 
           echo "JRE 크기: $(du -sh src-tauri/resources/jre | cut -f1)"
+
+          # 단일 파일로 번들하기 위해 zip 압축 후 디렉토리 삭제
+          powershell -Command "Compress-Archive -Path 'src-tauri\\resources\\jre' -DestinationPath 'src-tauri\\resources\\jre.zip' -Force"
+          rm -rf src-tauri/resources/jre
+          echo "jre.zip 크기: $(du -sh src-tauri/resources/jre.zip | cut -f1)"
 
       - name: Build (Windows)
         env:
