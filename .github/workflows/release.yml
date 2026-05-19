@@ -9,7 +9,7 @@ env:
   UV_VERSION: "0.11.14"
 
 jobs:
-  # ── 1. Ktor server JAR 빌드 (플랫폼 무관) ──────────────────────
+  # ── 1. Ktor server JAR 빌드 ────────────────────────────────────
   build-server:
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +20,24 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Gradle 의존성 캐시
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ hashFiles('server/**/*.gradle*', 'server/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: server.jar 캐시
+        id: jar-cache
+        uses: actions/cache@v4
+        with:
+          path: server/app/build/libs/server.jar
+          key: server-jar-${{ hashFiles('server/app/src/**', 'server/**/*.gradle*', 'server/gradle/wrapper/gradle-wrapper.properties') }}
+
       - name: Build server.jar
+        if: steps.jar-cache.outputs.cache-hit != 'true'
         working-directory: server
         run: ./gradlew shadowJar
 
@@ -44,6 +61,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
 
       - uses: cargo-bins/cargo-binstall@main
 
@@ -71,7 +93,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: cargo tauri build --target aarch64-apple-darwin
-        working-directory: .
 
       - name: Create .app.tar.gz + sign
         env:
@@ -86,13 +107,17 @@ jobs:
           cargo tauri signer sign \
             src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pdf-to-markdown.app.tar.gz
 
+      - name: Stage macOS artifacts
+        run: |
+          mkdir -p staging
+          cp src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pdf-to-markdown.app.tar.gz staging/
+          cp src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pdf-to-markdown.app.tar.gz.sig staging/
+          cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg staging/
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
-          path: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pdf-to-markdown.app.tar.gz
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/pdf-to-markdown.app.tar.gz.sig
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          path: staging/
 
   # ── 3. Windows (x64) 빌드 ─────────────────────────────────────
   build-windows:
@@ -109,6 +134,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+
+      - name: Rust 빌드 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
 
       - uses: cargo-bins/cargo-binstall@main
 
@@ -135,20 +165,23 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: cargo tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
+
+      - name: Stage Windows artifacts
+        shell: bash
         run: |
-          cargo tauri build --target x86_64-pc-windows-msvc `
-            --config src-tauri/tauri.windows.conf.json
+          mkdir -p staging
+          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.msi" -exec cp {} staging/ \;
+          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.msi.sig" -exec cp {} staging/ \;
+          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.exe" -not -name "*.exe.sig" -exec cp {} staging/ \; || true
+          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.exe.sig" -exec cp {} staging/ \; || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
-          path: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig
+          path: staging/
 
-  # ── 4. GitHub Release 생성 + latest.json 업로드 ───────────────
+  # ── 4. GitHub Release 생성 + latest.json ──────────────────────
   release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
@@ -173,10 +206,9 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
 
-          # Windows sig (.msi.sig 또는 .exe.sig 중 먼저 존재하는 것)
-          WIN_SIG_FILE=$(find artifacts/windows -name "*.sig" | head -1)
+          WIN_SIG_FILE=$(find artifacts/windows -name "*.msi.sig" -o -name "*.exe.sig" | head -1)
           WIN_SIG=$(cat "$WIN_SIG_FILE")
-          WIN_INSTALLER=$(find artifacts/windows -name "*.msi" -o -name "*.exe" | grep -v sig | head -1)
+          WIN_INSTALLER=$(find artifacts/windows \( -name "*.msi" -o -name "*.exe" \) ! -name "*.sig" | head -1)
           WIN_FILENAME=$(basename "$WIN_INSTALLER")
 
           cat > latest.json <<EOF
@@ -201,8 +233,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/macos/pdf-to-markdown.app.tar.gz
-            artifacts/macos/pdf-to-markdown.app.tar.gz.sig
+            artifacts/macos/*.tar.gz
+            artifacts/macos/*.tar.gz.sig
             artifacts/macos/*.dmg
             artifacts/windows/*.msi
             artifacts/windows/*.msi.sig
