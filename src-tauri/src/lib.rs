@@ -74,11 +74,13 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 ///
 /// 우선순위:
 /// 1. `JAVA_HOME` 환경변수 → `$JAVA_HOME/bin/java(.exe)`
-/// 2. `PATH`에서 `java` 검색 (fallback)
+/// 2. Windows: 주요 설치 경로 직접 탐색 (Oracle, Temurin, Microsoft, Corretto)
+/// 3. `PATH`에서 `java` 검색 (fallback)
 ///
 /// Windows GUI 앱은 사용자 셸과 다른 환경을 상속받아 PATH에서 java를 못 찾는 경우가 있으므로
-/// JAVA_HOME을 먼저 확인한다.
+/// JAVA_HOME 및 공통 설치 경로를 먼저 확인한다.
 fn find_java() -> std::path::PathBuf {
+    // 1. JAVA_HOME
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
         #[cfg(target_os = "windows")]
         let candidate = std::path::PathBuf::from(&java_home).join("bin").join("java.exe");
@@ -89,9 +91,32 @@ fn find_java() -> std::path::PathBuf {
             log::info!("Java found via JAVA_HOME: {}", candidate.display());
             return candidate;
         }
-        log::warn!("JAVA_HOME set ({java_home}) but java binary not found there, falling back to PATH");
+        log::warn!("JAVA_HOME={java_home} 설정됐지만 java 바이너리 없음, 경로 탐색으로 전환");
     }
 
+    // 2. Windows 주요 설치 경로 탐색
+    #[cfg(target_os = "windows")]
+    {
+        let program_files = std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+        let vendors = ["Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "BellSoft", "Azul"];
+        for vendor in &vendors {
+            let base = std::path::PathBuf::from(&program_files).join(vendor);
+            if let Ok(entries) = std::fs::read_dir(&base) {
+                // 하위 디렉토리 중 가장 버전이 높은 것 선택 (내림차순 정렬)
+                let mut dirs: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+                dirs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+                for entry in dirs {
+                    let candidate = entry.path().join("bin").join("java.exe");
+                    if candidate.exists() {
+                        log::info!("Java found via path scan: {}", candidate.display());
+                        return candidate;
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. PATH fallback
     #[cfg(target_os = "windows")]
     return std::path::PathBuf::from("java.exe");
     #[cfg(not(target_os = "windows"))]
@@ -469,7 +494,7 @@ pub fn run() {
                         let _ = app_handle.emit("server-error", msg);
                     }
                 } else {
-                    let msg = "Timed out waiting for PORT= from Ktor server. Java가 설치되지 않았거나 server.jar 실행에 실패했을 수 있습니다.";
+                    let msg = "서버 시작 타임아웃. Java 21이 설치되어 있는지 확인해주세요. (java.com 또는 adoptium.net에서 다운로드)";
                     log::error!("{msg}");
                     let _ = app_handle.emit("server-error", msg);
                 }
