@@ -79,7 +79,15 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 ///
 /// Windows GUI 앱은 사용자 셸과 다른 환경을 상속받아 PATH에서 java를 못 찾는 경우가 있으므로
 /// JAVA_HOME 및 공통 설치 경로를 먼저 확인한다.
-fn find_java() -> std::path::PathBuf {
+fn find_java(bundled_java: Option<std::path::PathBuf>) -> std::path::PathBuf {
+    // 0. 번들된 JRE (Windows 배포판에 포함)
+    if let Some(java) = bundled_java {
+        if java.exists() {
+            log::info!("번들 JRE 사용: {}", java.display());
+            return java;
+        }
+    }
+
     // 1. JAVA_HOME
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
         #[cfg(target_os = "windows")]
@@ -444,7 +452,15 @@ pub fn run() {
                 .path()
                 .resolve("server.jar", tauri::path::BaseDirectory::Resource)?;
 
-            let java = find_java();
+            // Windows 배포판에 번들된 JRE 경로 (없으면 None → 시스템 Java 탐색)
+            #[cfg(target_os = "windows")]
+            let bundled_java = app.path()
+                .resolve("jre/bin/java.exe", tauri::path::BaseDirectory::Resource)
+                .ok();
+            #[cfg(not(target_os = "windows"))]
+            let bundled_java: Option<std::path::PathBuf> = None;
+
+            let java = find_java(bundled_java);
             log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
             let mut child = Command::new(&java)
                 .arg("-jar")

@@ -161,6 +161,38 @@ jobs:
           UV_BIN=$(find . -name "uv.exe" | head -1)
           cp "$UV_BIN" src-tauri/resources/uv-windows-x86_64.exe
 
+      - name: Create minimal JRE with jlink (Windows)
+        shell: bash
+        run: |
+          # GitHub Actions Windows 러너에는 Java 21이 사전 설치되어 있음
+          JAVA_HOME_PATH="${JAVA_HOME_21_X64:-$JAVA_HOME}"
+          echo "JDK 경로: $JAVA_HOME_PATH"
+
+          # server.jar 의존 모듈 자동 분석
+          DETECTED=$("$JAVA_HOME_PATH/bin/jdeps" \
+            --ignore-missing-deps \
+            --print-module-deps \
+            --multi-release 21 \
+            server/app/build/libs/server.jar 2>/dev/null || echo "")
+
+          # Ktor 서버 필수 모듈 (jdeps가 놓치는 런타임 의존성 포함)
+          ESSENTIAL="java.base,java.logging,java.management,java.management.rmi,java.rmi,java.naming,java.net.http,java.security.jgss,java.xml,jdk.crypto.ec,jdk.management,jdk.zipfs,java.instrument"
+
+          # 합치고 중복 제거
+          ALL=$(echo "$DETECTED,$ESSENTIAL" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+          echo "포함 모듈: $ALL"
+
+          mkdir -p src-tauri/resources/jre
+          "$JAVA_HOME_PATH/bin/jlink" \
+            --add-modules "$ALL" \
+            --strip-debug \
+            --no-header-files \
+            --no-man-pages \
+            --compress=2 \
+            --output src-tauri/resources/jre
+
+          echo "JRE 크기: $(du -sh src-tauri/resources/jre | cut -f1)"
+
       - name: Build (Windows)
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
