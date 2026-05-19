@@ -12,6 +12,7 @@
  */
 
 import { saveTempPdf, readTextFile } from "./tauri-bridge";
+import { inlineImages } from "./image-inliner";
 import { serverBaseUrl } from "./main";
 
 // ---------------------------------------------------------------------------
@@ -131,6 +132,13 @@ export async function convertPdf(
   } catch (e) {
     callbacks.onError(`Markdown 파일 읽기 실패: ${e}`);
     return;
+  }
+
+  // 6. 로컬 이미지 경로 → Base64 인라인 치환 (오프라인 지원)
+  try {
+    markdown = await inlineImages(markdown, result.markdownPath);
+  } catch (e) {
+    console.warn("[converter] 이미지 인라인 처리 실패, 원본 마크다운 사용:", e);
   }
 
   callbacks.onComplete(markdown, result.jsonPath ?? null);
