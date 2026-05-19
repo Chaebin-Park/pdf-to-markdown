@@ -167,14 +167,29 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: cargo tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 
+      - name: Sign Windows installers
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+          for f in $(find "$BUNDLE_DIR" \( -name "*.msi" -o -name "*.exe" \) ! -name "*.sig"); do
+            echo "Signing: $f"
+            TAURI_SIGNING_PRIVATE_KEY="${TAURI_SIGNING_PRIVATE_KEY}" \
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
+            cargo tauri signer sign "$f"
+          done
+
       - name: Stage Windows artifacts
         shell: bash
         run: |
           mkdir -p staging
-          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.msi" -exec cp {} staging/ \;
-          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.msi.sig" -exec cp {} staging/ \;
-          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.exe" -not -name "*.exe.sig" -exec cp {} staging/ \; || true
-          find src-tauri/target/x86_64-pc-windows-msvc/release/bundle -name "*.exe.sig" -exec cp {} staging/ \; || true
+          BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+          find "$BUNDLE_DIR" -name "*.msi" -exec cp {} staging/ \;
+          find "$BUNDLE_DIR" -name "*.msi.sig" -exec cp {} staging/ \;
+          find "$BUNDLE_DIR" -name "*.exe" ! -name "*.sig" -exec cp {} staging/ \; || true
+          find "$BUNDLE_DIR" -name "*.exe.sig" -exec cp {} staging/ \; || true
 
       - uses: actions/upload-artifact@v4
         with:
