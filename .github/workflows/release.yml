@@ -200,34 +200,59 @@ jobs:
           name: windows-artifacts
           path: artifacts/windows
 
+      - name: List artifacts (debug)
+        run: find artifacts/ -type f | sort
+
       - name: Generate latest.json
         run: |
-          MACOS_SIG=$(cat artifacts/macos/pdf-to-markdown.app.tar.gz.sig)
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
+          python3 - <<'PYEOF'
+          import json, glob, os, subprocess
+          from datetime import datetime, timezone
 
-          WIN_SIG_FILE=$(find artifacts/windows -name "*.msi.sig" -o -name "*.exe.sig" | head -1)
-          WIN_SIG=$(cat "$WIN_SIG_FILE")
-          WIN_INSTALLER=$(find artifacts/windows \( -name "*.msi" -o -name "*.exe" \) ! -name "*.sig" | head -1)
-          WIN_FILENAME=$(basename "$WIN_INSTALLER")
+          version = "${{ github.ref_name }}".lstrip("v")
+          repo = "${{ github.repository }}"
+          tag = "${{ github.ref_name }}"
+          base_url = f"https://github.com/{repo}/releases/download/{tag}"
+          pub_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-          cat > latest.json <<EOF
-          {
-            "version": "${VERSION}",
-            "notes": "See https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "darwin-aarch64": {
-                "signature": "${MACOS_SIG}",
-                "url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/pdf-to-markdown.app.tar.gz"
-              },
-              "windows-x86_64": {
-                "signature": "${WIN_SIG}",
-                "url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${WIN_FILENAME}"
+          # macOS sig
+          macos_sig = open("artifacts/macos/pdf-to-markdown.app.tar.gz.sig").read().strip()
+
+          # Windows sig (msi.sig or exe.sig)
+          win_sig_files = glob.glob("artifacts/windows/*.msi.sig") + glob.glob("artifacts/windows/*.exe.sig")
+          if not win_sig_files:
+              print("ERROR: No Windows .sig file found")
+              for f in sorted(os.listdir("artifacts/windows")):
+                  print(" ", f)
+              exit(1)
+          win_sig = open(win_sig_files[0]).read().strip()
+
+          # Windows installer
+          win_installers = [f for f in glob.glob("artifacts/windows/*.msi") + glob.glob("artifacts/windows/*.exe") if not f.endswith(".sig")]
+          if not win_installers:
+              print("ERROR: No Windows installer found")
+              exit(1)
+          win_filename = os.path.basename(win_installers[0])
+
+          data = {
+              "version": version,
+              "notes": f"See https://github.com/{repo}/releases/tag/{tag}",
+              "pub_date": pub_date,
+              "platforms": {
+                  "darwin-aarch64": {
+                      "signature": macos_sig,
+                      "url": f"{base_url}/pdf-to-markdown.app.tar.gz"
+                  },
+                  "windows-x86_64": {
+                      "signature": win_sig,
+                      "url": f"{base_url}/{win_filename}"
+                  }
               }
-            }
           }
-          EOF
+          with open("latest.json", "w") as f:
+              json.dump(data, f, indent=2)
+          print(open("latest.json").read())
+          PYEOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
