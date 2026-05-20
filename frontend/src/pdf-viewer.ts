@@ -63,7 +63,13 @@ export function mountPdfViewer(container: HTMLElement): void {
       </div>
       <div class="pdf-toolbar" id="pdf-toolbar" style="display:none">
         <span class="pdf-filename" id="pdf-filename"></span>
-        <span class="pdf-pagecount" id="pdf-pagecount"></span>
+        <span class="pdf-pagecount" id="pdf-pagecount" style="display:none"></span>
+        <div class="pdf-page-nav" id="pdf-page-nav" style="display:none">
+          <button class="pdf-page-nav-btn" id="pdf-page-prev" title="이전 페이지">‹</button>
+          <input class="pdf-page-input" id="pdf-page-input" type="number" min="1" value="1" title="페이지 이동" />
+          <span class="pdf-page-total" id="pdf-page-total">/ 1</span>
+          <button class="pdf-page-nav-btn" id="pdf-page-next" title="다음 페이지">›</button>
+        </div>
         <select class="pdf-mode-select" id="pdf-mode-select" title="변환 모드 선택">
           <option value="STANDARD">Standard</option>
           <option value="HYBRID">Hybrid AI</option>
@@ -188,6 +194,17 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   pagecountEl.textContent = `${totalPages} pages`;
   pages.innerHTML = "";
 
+  // 페이지 네비게이션 UI 초기화 (observer는 renderAllPages 이후에 연결)
+  const pageNav = document.getElementById("pdf-page-nav") as HTMLElement | null;
+  const pageInput = document.getElementById("pdf-page-input") as HTMLInputElement | null;
+  const pageTotalEl = document.getElementById("pdf-page-total") as HTMLElement | null;
+  if (pageNav && pageInput && pageTotalEl) {
+    pageNav.style.display = "flex";
+    pageInput.value = "1";
+    pageInput.max = String(previewPages);
+    pageTotalEl.textContent = `/ ${totalPages}`;
+  }
+
   // 대용량 PDF 경고 배너
   if (totalPages > PREVIEW_PAGE_LIMIT) {
     const banner = document.createElement("div");
@@ -204,6 +221,9 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   resizeObserver.observe(viewerEl);
 
   await renderAllPages(pdfDoc, version, previewPages);
+
+  // 렌더링 완료 후 IntersectionObserver + 버튼 이벤트 연결
+  if (pageInput) setupPageNav(pageInput, previewPages, pages);
 }
 
 async function renderAllPages(doc: PDFDocumentProxy, version: number, limit: number = doc.numPages): Promise<void> {
@@ -279,6 +299,57 @@ async function renderPage(page: PDFPageProxy, canvas: HTMLCanvasElement): Promis
     ctx.font = "13px sans-serif";
     ctx.fillText(`렌더링 실패: ${e}`, 10, 30);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Page navigation
+// ---------------------------------------------------------------------------
+
+function jumpToPage(pageNum: number, pagesEl: HTMLElement): void {
+  const wrapper = pagesEl.querySelector<HTMLElement>(`.pdf-page-wrapper[data-page="${pageNum}"]`);
+  wrapper?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function setupPageNav(
+  input: HTMLInputElement,
+  previewLimit: number,
+  pagesEl: HTMLElement,
+): void {
+  // IntersectionObserver로 현재 뷰포트 페이지 추적
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((e) => e.isIntersecting)
+        .map((e) => Number((e.target as HTMLElement).dataset.page))
+        .filter((n) => !isNaN(n));
+      if (visible.length > 0) {
+        input.value = String(Math.min(...visible));
+      }
+    },
+    { root: pagesEl.parentElement, threshold: 0.3 },
+  );
+
+  pagesEl.querySelectorAll<HTMLElement>(".pdf-page-wrapper").forEach((w) => observer.observe(w));
+
+  // 입력 필드 Enter → 해당 페이지로 이동
+  input.addEventListener("change", () => {
+    const n = Math.max(1, Math.min(previewLimit, parseInt(input.value) || 1));
+    input.value = String(n);
+    jumpToPage(n, pagesEl);
+  });
+
+  // 이전/다음 버튼
+  document.getElementById("pdf-page-prev")?.addEventListener("click", () => {
+    const n = Math.max(1, (parseInt(input.value) || 1) - 1);
+    input.value = String(n);
+    jumpToPage(n, pagesEl);
+  });
+
+  document.getElementById("pdf-page-next")?.addEventListener("click", () => {
+    const n = Math.min(previewLimit, (parseInt(input.value) || 1) + 1);
+    input.value = String(n);
+    jumpToPage(n, pagesEl);
+  });
 }
 
 // ---------------------------------------------------------------------------

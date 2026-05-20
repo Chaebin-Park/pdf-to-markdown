@@ -317,6 +317,53 @@ body,
   cursor: default;
 }
 
+/* 페이지 네비게이션 */
+.pdf-page-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pdf-page-nav-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: #2d2d2d;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 3px;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.pdf-page-nav-btn:hover {
+  background: #3a3a3a;
+}
+
+.pdf-page-input {
+  width: 40px;
+  text-align: center;
+  background: #1e1e1e;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 3px;
+  font-size: 12px;
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+
+.pdf-page-input::-webkit-outer-spin-button,
+.pdf-page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.pdf-page-total {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
 .pdf-cancel-btn {
   padding: 4px 10px;
   background: #5a2020;
