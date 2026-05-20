@@ -117,6 +117,7 @@ function renderApp(root: HTMLDivElement): void {
   setSettingsHandler(() => showSettings());
   maybeShowOnboarding();
   checkForUpdates();
+  registerKeyboardShortcuts();
 
   setCancelHandler(() => {
     cancelConversion();
@@ -158,6 +159,31 @@ function renderApp(root: HTMLDivElement): void {
         setConverting(false);
       },
     });
+  });
+}
+
+function registerKeyboardShortcuts(): void {
+  document.addEventListener("keydown", (e: KeyboardEvent) => {
+    const mod = e.metaKey || e.ctrlKey;
+
+    // 입력 필드 포커스 중에는 단축키 비활성화
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+    if (mod && e.key === "o") {
+      e.preventDefault();
+      (document.getElementById("pdf-open-dialog-btn") as HTMLButtonElement | null)?.click();
+    } else if (mod && e.key === "Enter") {
+      e.preventDefault();
+      const convertBtn = document.getElementById("pdf-convert-btn") as HTMLButtonElement | null;
+      if (convertBtn && !convertBtn.disabled) convertBtn.click();
+    } else if (mod && e.key === "s") {
+      e.preventDefault();
+      (document.getElementById("md-save-btn") as HTMLButtonElement | null)?.click();
+    } else if (e.key === "Escape") {
+      const cancelBtn = document.getElementById("pdf-cancel-btn") as HTMLButtonElement | null;
+      if (cancelBtn && cancelBtn.style.display !== "none") cancelBtn.click();
+    }
   });
 }
 
