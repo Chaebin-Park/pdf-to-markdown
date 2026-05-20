@@ -17,6 +17,7 @@ import {
   type InstallProgress,
 } from "./tauri-bridge";
 import { setDoclingReady } from "./docling-state";
+import { getTheme, setTheme, type ThemeMode } from "./theme";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -71,6 +72,19 @@ function renderModal(installed: boolean): void {
           <div class="settings-log-box" id="settings-log-box"></div>
         </div>
       </section>
+
+      <section class="settings-section">
+        <div class="settings-section-header">
+          <span class="settings-section-title">테마</span>
+        </div>
+        <div class="settings-theme-row">
+          ${(["dark", "system", "light"] as ThemeMode[]).map((m) => `
+            <button class="settings-theme-btn ${getTheme() === m ? "active" : ""}"
+                    data-theme-mode="${m}">
+              ${m === "dark" ? "다크" : m === "light" ? "라이트" : "시스템"}
+            </button>`).join("")}
+        </div>
+      </section>
     </div>
   `;
 
@@ -89,6 +103,15 @@ function renderModal(installed: boolean): void {
     const target = e.target as HTMLElement;
     if (target.id === "hybrid-install-btn") startInstall();
     if (target.id === "hybrid-uninstall-btn") startUninstall();
+  });
+
+  modal.querySelectorAll<HTMLButtonElement>(".settings-theme-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.themeMode as ThemeMode;
+      setTheme(mode);
+      modal.querySelectorAll(".settings-theme-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
   });
 }
 

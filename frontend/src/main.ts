@@ -13,6 +13,7 @@ import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
 import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
 import { maybeShowOnboarding, showOnboarding } from "./onboarding";
 import { showSettings } from "./settings";
+import { initTheme } from "./theme";
 import { setDoclingReady } from "./docling-state";
 import { checkForUpdates } from "./updater";
 
@@ -23,6 +24,7 @@ import { checkForUpdates } from "./updater";
 export let serverBaseUrl: string | null = null;
 
 async function init() {
+  initTheme();
   const root = document.querySelector<HTMLDivElement>("#app")!;
   renderLoading(root);
 

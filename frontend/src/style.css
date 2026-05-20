@@ -1172,3 +1172,175 @@ body,
   padding: 0 2px;
 }
 .update-dismiss:hover { color: #ccc; }
+
+/* -------------------------------------------------------------------------
+   설정 모달 — 테마 토글 버튼
+   ---------------------------------------------------------------------- */
+
+.settings-theme-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.settings-theme-btn {
+  flex: 1;
+  padding: 6px 0;
+  background: #2d2d2d;
+  color: #aaa;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-theme-btn:hover {
+  background: #3a3a3a;
+  color: #ccc;
+}
+
+.settings-theme-btn.active {
+  background: #0e639c;
+  color: #fff;
+  border-color: #0e639c;
+}
+
+/* -------------------------------------------------------------------------
+   라이트 테마 오버라이드  [data-theme="light"]
+   ---------------------------------------------------------------------- */
+
+[data-theme="light"] body,
+[data-theme="light"] #app {
+  background: #f0f0f0;
+  color: #1e1e1e;
+}
+
+[data-theme="light"] .layout {
+  background: #f0f0f0;
+}
+
+[data-theme="light"] .panel-left,
+[data-theme="light"] .panel-right {
+  background: #ffffff;
+}
+
+[data-theme="light"] .divider {
+  background: #d0d0d0;
+}
+
+[data-theme="light"] .pdf-toolbar,
+[data-theme="light"] .md-toolbar,
+[data-theme="light"] .md-help-bar {
+  background: #e8e8e8;
+  border-bottom: 1px solid #d0d0d0;
+}
+
+[data-theme="light"] .pdf-dropzone {
+  background: #fafafa;
+  border: 2px dashed #c0c0c0;
+  color: #555;
+}
+
+[data-theme="light"] .pdf-dropzone-inner p {
+  color: #555;
+}
+
+[data-theme="light"] .pdf-filename,
+[data-theme="light"] .pdf-page-total,
+[data-theme="light"] .pdf-recent-label {
+  color: #555;
+}
+
+[data-theme="light"] .pdf-mode-select,
+[data-theme="light"] .pdf-page-input {
+  background: #fff;
+  color: #1e1e1e;
+  border-color: #c0c0c0;
+}
+
+[data-theme="light"] .pdf-page-nav-btn,
+[data-theme="light"] .pdf-mode-help {
+  background: #e0e0e0;
+  color: #444;
+  border-color: #c0c0c0;
+}
+
+[data-theme="light"] .pdf-mode-tooltip {
+  background: #fff;
+  border-color: #d0d0d0;
+  color: #1e1e1e;
+}
+
+[data-theme="light"] .pdf-recent-item {
+  color: #555;
+}
+
+[data-theme="light"] .pdf-recent-item:hover {
+  background: #e8e8e8;
+  color: #1e1e1e;
+}
+
+[data-theme="light"] .pdf-recent-list {
+  border-top-color: #d0d0d0;
+}
+
+[data-theme="light"] .md-content {
+  color: #1e1e1e;
+}
+
+[data-theme="light"] .md-btn {
+  background: #e0e0e0;
+  color: #333;
+  border-color: #c0c0c0;
+}
+
+[data-theme="light"] .md-btn:hover {
+  background: #d0d0d0;
+}
+
+[data-theme="light"] .settings-card,
+[data-theme="light"] .onboarding-card {
+  background: #ffffff;
+  color: #1e1e1e;
+}
+
+[data-theme="light"] .settings-section {
+  border-top-color: #e0e0e0;
+}
+
+[data-theme="light"] .settings-section-title,
+[data-theme="light"] .settings-title {
+  color: #1e1e1e;
+}
+
+[data-theme="light"] .settings-section-desc {
+  color: #555;
+}
+
+[data-theme="light"] .settings-theme-btn {
+  background: #e8e8e8;
+  color: #333;
+  border-color: #c0c0c0;
+}
+
+[data-theme="light"] .settings-theme-btn:hover {
+  background: #d8d8d8;
+}
+
+[data-theme="light"] .pdf-preview-limit-banner {
+  background: #fff8e1;
+  border-color: #f0c040;
+  color: #7a5500;
+}
+
+[data-theme="light"] .pdf-preview-limit-notice {
+  color: #999;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
