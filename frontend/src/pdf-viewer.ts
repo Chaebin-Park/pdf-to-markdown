@@ -127,12 +127,22 @@ export function mountPdfViewer(container: HTMLElement): void {
           <span class="pdf-page-total" id="pdf-page-total">/ 1</span>
           <button class="pdf-page-nav-btn" id="pdf-page-next" title="다음 페이지">›</button>
         </div>
-        <select class="pdf-mode-select" id="pdf-mode-select" title="변환 모드 선택">
-          <option value="STANDARD">Standard</option>
-          <option value="HYBRID">Hybrid AI</option>
-          <option value="OCR">OCR</option>
-          <option value="FORMULA">Formula</option>
-        </select>
+        <div class="pdf-mode-group">
+          <select class="pdf-mode-select" id="pdf-mode-select" title="변환 모드 선택">
+            <option value="STANDARD">Standard</option>
+            <option value="HYBRID">Hybrid AI</option>
+            <option value="OCR">OCR</option>
+            <option value="FORMULA">Formula</option>
+          </select>
+          <span class="pdf-mode-help" tabindex="0">?
+            <span class="pdf-mode-tooltip">
+              <b>Standard</b> — 빠른 텍스트 추출. 일반 문서에 적합.<br>
+              <b>Hybrid AI</b> — AI 레이아웃 분석. 복잡한 논문·보고서 (설치 필요).<br>
+              <b>OCR</b> — 스캔 PDF 텍스트 추출 (설치 필요).<br>
+              <b>Formula</b> — 수식 포함 논문 전용, LaTeX 추출 (설치 필요).
+            </span>
+          </span>
+        </div>
         <span class="pdf-mode-warning" id="pdf-mode-warning" style="display:none" title="docling-serve가 준비되지 않았습니다. 설정에서 Hybrid 모드를 설치하세요.">⚠</span>
         <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
         <button class="pdf-cancel-btn" id="pdf-cancel-btn" title="변환 취소" style="display:none">취소</button>
