@@ -12,7 +12,13 @@
  */
 
 const MIN_PANEL_PX = 200;
-const DEFAULT_LEFT_RATIO = 0.5; // 초기 좌측 패널 비율
+const DEFAULT_LEFT_RATIO = 0.5;
+const RATIO_STORAGE_KEY = "panelLeftRatio";
+
+function getSavedRatio(): number {
+  const v = parseFloat(localStorage.getItem(RATIO_STORAGE_KEY) ?? "");
+  return isNaN(v) ? DEFAULT_LEFT_RATIO : Math.max(0.15, Math.min(0.85, v));
+}
 
 /** 레이아웃 HTML을 #app에 주입하고 리사이저를 활성화한다. */
 export function mountLayout(root: HTMLDivElement): void {
@@ -52,8 +58,8 @@ function initResizer(
   _panelRight: HTMLDivElement,
   divider: HTMLDivElement,
 ): void {
-  // flex-basis 로 너비를 제어한다.
-  setLeftRatio(panelLeft, DEFAULT_LEFT_RATIO);
+  // 저장된 비율 복원, 없으면 기본값 사용
+  setLeftRatio(panelLeft, getSavedRatio());
 
   let dragging = false;
   let startX = 0;
@@ -84,6 +90,10 @@ function initResizer(
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
     setOverlay(false);
+    // 현재 비율 저장
+    const totalWidth = layout.getBoundingClientRect().width;
+    const currentBasis = panelLeft.getBoundingClientRect().width;
+    localStorage.setItem(RATIO_STORAGE_KEY, String((currentBasis / totalWidth).toFixed(4)));
   });
 }
 
