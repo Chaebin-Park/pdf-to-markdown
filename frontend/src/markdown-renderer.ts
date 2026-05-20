@@ -9,6 +9,7 @@
 
 import { marked, Renderer } from "marked";
 import hljs from "highlight.js";
+import renderMathInElement from "katex/contrib/auto-render";
 
 // ---------------------------------------------------------------------------
 // marked 설정
@@ -138,6 +139,13 @@ function renderContent(): void {
     content.innerHTML = `<pre class="md-raw">${escapeHtml(rawMarkdown)}</pre>`;
   } else {
     content.innerHTML = marked.parse(rawMarkdown) as string;
+    renderMathInElement(content, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false },
+      ],
+      throwOnError: false,
+    });
   }
 }
 

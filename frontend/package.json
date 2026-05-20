@@ -10,6 +10,7 @@
     "postinstall": "cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdf.worker.min.mjs"
   },
   "devDependencies": {
+    "@types/katex": "^0.16.8",
     "typescript": "~6.0.2",
     "vite": "^8.0.12"
   },
@@ -18,6 +19,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "highlight.js": "^11.11.1",
+    "katex": "^0.16.47",
     "marked": "^18.0.3",
     "pdfjs-dist": "^4.10.38"
   }
