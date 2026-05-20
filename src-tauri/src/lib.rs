@@ -339,6 +339,20 @@ fn uninstall_hybrid(
     Ok(())
 }
 
+/// Windows Extended-Length Path 접두사(`\\?\`)를 제거해 일반 경로로 변환한다.
+///
+/// Java launcher는 `\\?\` 접두사가 붙은 경로로 `-jar`를 전달하면 JAR를 찾지 못한다.
+fn normalize_path(path: std::path::PathBuf) -> std::path::PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        let s = path.to_string_lossy();
+        if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            return std::path::PathBuf::from(stripped.to_string());
+        }
+    }
+    path
+}
+
 /// 지정 포트로 TCP 연결을 시도하며 서버 기동을 확인한다.
 ///
 /// `timeout_secs` 초 내에 연결이 성공하면 `true`, 타임아웃이면 `false`를 반환한다.
@@ -520,7 +534,8 @@ pub fn run() {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|_| "조회 실패".to_string());
 
-            let java = find_java(bundled_java);
+            let java = normalize_path(find_java(bundled_java));
+            let jar_path = normalize_path(jar_path);
             let java_display = java.display().to_string();
 
             log::info!("[진단] 리소스 디렉토리: {resource_dir}");
