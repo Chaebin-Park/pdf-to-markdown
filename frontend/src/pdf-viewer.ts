@@ -13,11 +13,11 @@ import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
 import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
 
-// public/pdf.worker.min.mjs 를 직접 참조한다.
-// npm install 후 postinstall 스크립트로 복사되며,
-// dev(http://localhost:1420/pdf.worker.min.mjs)와
-// prod(tauri://localhost/pdf.worker.min.mjs) 모두 동일 경로로 접근 가능하다.
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+// 뷰어에 렌더링할 최대 페이지 수. 초과분은 DOM에 추가하지 않는다.
+// 변환(서버 처리)은 전체 페이지를 그대로 전송하므로 영향 없음.
+const PREVIEW_PAGE_LIMIT = 100;
 
 /** 현재 로드된 PDF 파일명. 외부에서 참조 가능. */
 export let currentPdfName: string | null = null;
@@ -171,8 +171,18 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   if (renderVersion !== version) return; // 취소됨
 
   filenameEl.textContent = name;
-  pagecountEl.textContent = `${pdfDoc.numPages} pages`;
+  const totalPages = pdfDoc.numPages;
+  const previewPages = Math.min(totalPages, PREVIEW_PAGE_LIMIT);
+  pagecountEl.textContent = `${totalPages} pages`;
   pages.innerHTML = "";
+
+  // 대용량 PDF 경고 배너
+  if (totalPages > PREVIEW_PAGE_LIMIT) {
+    const banner = document.createElement("div");
+    banner.className = "pdf-preview-limit-banner";
+    banner.textContent = `⚠ ${totalPages}페이지 — 미리보기는 앞 ${PREVIEW_PAGE_LIMIT}페이지만 표시됩니다. 변환은 전체 페이지를 처리합니다.`;
+    pages.appendChild(banner);
+  }
 
   // ResizeObserver: 패널 너비 변경 시 재렌더링
   resizeObserver?.disconnect();
@@ -181,14 +191,14 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   });
   resizeObserver.observe(viewerEl);
 
-  await renderAllPages(pdfDoc, version);
+  await renderAllPages(pdfDoc, version, previewPages);
 }
 
-async function renderAllPages(doc: PDFDocumentProxy, version: number): Promise<void> {
+async function renderAllPages(doc: PDFDocumentProxy, version: number, limit: number = doc.numPages): Promise<void> {
   const pages = document.getElementById("pdf-pages") as HTMLElement;
   if (!pages) return;
 
-  for (let i = 1; i <= doc.numPages; i++) {
+  for (let i = 1; i <= limit; i++) {
     if (renderVersion !== version) return;
     const page = await doc.getPage(i);
     const canvas = buildCanvas(page, pages.clientWidth);
@@ -198,6 +208,13 @@ async function renderAllPages(doc: PDFDocumentProxy, version: number): Promise<v
     wrapper.appendChild(canvas);
     pages.appendChild(wrapper);
     await renderPage(page, canvas);
+  }
+
+  if (limit < doc.numPages) {
+    const notice = document.createElement("div");
+    notice.className = "pdf-preview-limit-notice";
+    notice.textContent = `... 이하 ${doc.numPages - limit}페이지 미리보기 생략`;
+    pages.appendChild(notice);
   }
 }
 

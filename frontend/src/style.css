@@ -340,6 +340,26 @@ body,
   max-width: 100%;
 }
 
+/* 대용량 PDF 미리보기 제한 배너 */
+.pdf-preview-limit-banner {
+  margin: 8px 12px;
+  padding: 8px 12px;
+  background: #3a2e00;
+  border: 1px solid #6b5200;
+  border-radius: 4px;
+  color: #f0c040;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* 페이지 생략 안내 (페이지 목록 하단) */
+.pdf-preview-limit-notice {
+  text-align: center;
+  padding: 16px 0 24px;
+  color: #777;
+  font-size: 12px;
+}
+
 /* Loading state inside pdf-pages */
 .pdf-loading {
   display: flex;
