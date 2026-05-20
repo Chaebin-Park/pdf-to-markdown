@@ -7,6 +7,7 @@ on:
 
 env:
   UV_VERSION: "0.11.14"
+  TAURI_CLI_VERSION: "2"
 
 jobs:
   # ── 1. Ktor server JAR 빌드 ────────────────────────────────────
@@ -67,10 +68,19 @@ jobs:
         with:
           workspaces: "src-tauri -> target"
 
+      - name: tauri-cli 캐시
+        id: tauri-cli-cache-macos
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-tauri
+          key: tauri-cli-${{ runner.os }}-v${{ env.TAURI_CLI_VERSION }}
+
       - uses: cargo-bins/cargo-binstall@main
+        if: steps.tauri-cli-cache-macos.outputs.cache-hit != 'true'
 
       - name: Install tauri-cli
-        run: cargo binstall --no-confirm tauri-cli@^2
+        if: steps.tauri-cli-cache-macos.outputs.cache-hit != 'true'
+        run: cargo binstall --no-confirm tauri-cli@^${{ env.TAURI_CLI_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -140,10 +150,19 @@ jobs:
         with:
           workspaces: "src-tauri -> target"
 
+      - name: tauri-cli 캐시
+        id: tauri-cli-cache-windows
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-tauri.exe
+          key: tauri-cli-${{ runner.os }}-v${{ env.TAURI_CLI_VERSION }}
+
       - uses: cargo-bins/cargo-binstall@main
+        if: steps.tauri-cli-cache-windows.outputs.cache-hit != 'true'
 
       - name: Install tauri-cli
-        run: cargo binstall --no-confirm tauri-cli@^2
+        if: steps.tauri-cli-cache-windows.outputs.cache-hit != 'true'
+        run: cargo binstall --no-confirm tauri-cli@^${{ env.TAURI_CLI_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -161,7 +180,15 @@ jobs:
           UV_BIN=$(find . -name "uv.exe" | head -1)
           cp "$UV_BIN" src-tauri/resources/uv-windows-x86_64.exe
 
+      - name: JRE zip 캐시
+        id: jre-cache
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/jre.zip
+          key: jre-zip-${{ hashFiles('server/app/build/libs/server.jar') }}
+
       - name: Create minimal JRE with jlink (Windows)
+        if: steps.jre-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           # GitHub Actions Windows 러너에는 Java 21이 사전 설치되어 있음
