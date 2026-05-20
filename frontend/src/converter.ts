@@ -54,6 +54,20 @@ export interface ConversionCallbacks {
 }
 
 // ---------------------------------------------------------------------------
+// Cancellation
+// ---------------------------------------------------------------------------
+
+let activeEventSource: EventSource | null = null;
+let conversionCancelled = false;
+
+/** 진행 중인 변환을 취소한다. SSE 연결을 닫고 이후 단계를 건너뛴다. */
+export function cancelConversion(): void {
+  conversionCancelled = true;
+  activeEventSource?.close();
+  activeEventSource = null;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -69,6 +83,8 @@ export async function convertPdf(
   mode: ConvertMode,
   callbacks: ConversionCallbacks,
 ): Promise<void> {
+  conversionCancelled = false;
+
   const base = serverBaseUrl;
   if (!base) {
     callbacks.onError("서버가 아직 준비되지 않았습니다.");
@@ -105,6 +121,8 @@ export async function convertPdf(
 
   // 3. SSE 진행률 수신
   await listenProgress(base, jobId, callbacks.onProgress);
+
+  if (conversionCancelled) return;
 
   // 4. 결과 조회
   let result: JobResult;
@@ -159,6 +177,7 @@ function listenProgress(
 ): Promise<void> {
   return new Promise((resolve) => {
     const es = new EventSource(`${base}/progress/${jobId}`);
+    activeEventSource = es;
 
     es.onmessage = (event) => {
       try {

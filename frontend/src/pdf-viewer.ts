@@ -33,6 +33,7 @@ let pdfDoc: PDFDocumentProxy | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let renderVersion = 0; // 재렌더링 시 이전 작업 취소용
 let convertHandler: (() => void) | null = null;
+let cancelHandler: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -71,6 +72,7 @@ export function mountPdfViewer(container: HTMLElement): void {
         </select>
         <span class="pdf-mode-warning" id="pdf-mode-warning" style="display:none" title="docling-serve가 준비되지 않았습니다. 설정에서 Hybrid 모드를 설치하세요.">⚠</span>
         <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
+        <button class="pdf-cancel-btn" id="pdf-cancel-btn" title="변환 취소" style="display:none">취소</button>
         <button class="pdf-bbox-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
       </div>
       <div class="pdf-pages" id="pdf-pages" style="display:none"></div>
@@ -84,6 +86,10 @@ export function mountPdfViewer(container: HTMLElement): void {
   document.getElementById("pdf-convert-btn")?.addEventListener("click", () => {
     convertHandler?.();
   });
+
+  document.getElementById("pdf-cancel-btn")?.addEventListener("click", () => {
+    cancelHandler?.();
+  });
 }
 
 /**
@@ -92,6 +98,10 @@ export function mountPdfViewer(container: HTMLElement): void {
  */
 export function setConvertHandler(handler: () => void): void {
   convertHandler = handler;
+}
+
+export function setCancelHandler(handler: () => void): void {
+  cancelHandler = handler;
 }
 
 /** 현재 선택된 변환 모드를 반환한다. */
@@ -123,9 +133,11 @@ export function setBBoxAvailable(available: boolean, onToggle?: () => void): voi
  */
 export function setConverting(active: boolean): void {
   const btn = document.getElementById("pdf-convert-btn") as HTMLButtonElement | null;
+  const cancelBtn = document.getElementById("pdf-cancel-btn") as HTMLButtonElement | null;
   if (!btn) return;
   btn.disabled = active;
   btn.textContent = active ? "변환 중…" : "변환";
+  if (cancelBtn) cancelBtn.style.display = active ? "inline-block" : "none";
 }
 
 /** File 객체로 PDF를 로드한다. */

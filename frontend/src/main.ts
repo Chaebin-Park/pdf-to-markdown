@@ -6,9 +6,9 @@ import {
   checkHybridInstalled, startDoclingServe, onDoclingReady, getDoclingPort,
 } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
-import { mountPdfViewer, setConvertHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
+import { mountPdfViewer, setConvertHandler, setCancelHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
 import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown, setHelpHandler, setSettingsHandler } from "./markdown-renderer";
-import { convertPdf } from "./converter";
+import { convertPdf, cancelConversion } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
 import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
 import { maybeShowOnboarding, showOnboarding } from "./onboarding";
@@ -117,6 +117,13 @@ function renderApp(root: HTMLDivElement): void {
   setSettingsHandler(() => showSettings());
   maybeShowOnboarding();
   checkForUpdates();
+
+  setCancelHandler(() => {
+    cancelConversion();
+    hideProgress();
+    setStreaming(false);
+    setConverting(false);
+  });
 
   setConvertHandler(async () => {
     const buffer = currentPdfBuffer;
