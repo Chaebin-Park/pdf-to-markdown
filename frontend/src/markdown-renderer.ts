@@ -10,6 +10,8 @@
 import { marked, Renderer } from "marked";
 import hljs from "highlight.js";
 import renderMathInElement from "katex/contrib/auto-render";
+import { saveMarkdownFile } from "./tauri-bridge";
+import { currentPdfName } from "./pdf-viewer";
 
 // ---------------------------------------------------------------------------
 // marked 설정
@@ -34,6 +36,7 @@ const ID = {
   root: "md-renderer",
   toolbar: "md-toolbar",
   copyBtn: "md-copy-btn",
+  saveBtn: "md-save-btn",
   rawBtn: "md-raw-btn",
   content: "md-content",
   placeholder: "md-placeholder",
@@ -57,6 +60,7 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
       <div class="md-toolbar" id="${ID.toolbar}" style="display:none">
         <button class="md-btn" id="${ID.rawBtn}" title="원문 보기">Raw</button>
         <button class="md-btn" id="${ID.copyBtn}" title="클립보드에 복사">Copy</button>
+        <button class="md-btn" id="${ID.saveBtn}" title="마크다운 파일로 저장">Save</button>
       </div>
       <div class="md-help-bar">
         <button class="md-settings-btn" id="md-settings-btn" title="설정">⚙</button>
@@ -70,6 +74,7 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
   `;
 
   document.getElementById(ID.copyBtn)?.addEventListener("click", handleCopy);
+  document.getElementById(ID.saveBtn)?.addEventListener("click", handleSave);
   document.getElementById(ID.rawBtn)?.addEventListener("click", handleToggleRaw);
 }
 
@@ -171,6 +176,37 @@ function handleCopy(): void {
       btn.disabled = false;
     }, 1500);
   });
+}
+
+async function handleSave(): Promise<void> {
+  if (!rawMarkdown) return;
+  const btn = document.getElementById(ID.saveBtn) as HTMLButtonElement | null;
+  if (!btn) return;
+
+  const defaultName = currentPdfName
+    ? currentPdfName.replace(/\.pdf$/i, ".md")
+    : "output.md";
+
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  try {
+    const saved = await saveMarkdownFile(rawMarkdown, defaultName);
+    if (saved) {
+      btn.textContent = "Saved!";
+      setTimeout(() => {
+        btn.textContent = "Save";
+        btn.disabled = false;
+      }, 1500);
+    } else {
+      // 사용자가 다이얼로그를 취소함
+      btn.textContent = "Save";
+      btn.disabled = false;
+    }
+  } catch {
+    btn.textContent = "Save";
+    btn.disabled = false;
+  }
 }
 
 function handleToggleRaw(): void {

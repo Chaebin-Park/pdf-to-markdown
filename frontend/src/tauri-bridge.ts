@@ -7,6 +7,8 @@
 
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,4 +114,21 @@ export function readTextFile(path: string): Promise<string> {
 export async function readBinaryFile(path: string): Promise<Uint8Array> {
   const bytes = await invoke<number[]>("read_binary_file", { path });
   return new Uint8Array(bytes);
+}
+
+/**
+ * 저장 다이얼로그를 열고 사용자가 선택한 경로에 마크다운을 저장한다.
+ * 취소 시 null을 반환한다.
+ */
+export async function saveMarkdownFile(
+  content: string,
+  defaultName: string
+): Promise<string | null> {
+  const path = await save({
+    defaultPath: defaultName,
+    filters: [{ name: "Markdown", extensions: ["md"] }],
+  });
+  if (!path) return null;
+  await writeTextFile(path, content);
+  return path;
 }

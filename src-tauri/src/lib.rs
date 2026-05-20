@@ -504,6 +504,8 @@ pub fn run() {
                 .plugin(tauri_plugin_window_state::Builder::default().build())?;
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             app.handle().plugin(tauri_plugin_process::init())?;
+            app.handle().plugin(tauri_plugin_dialog::init())?;
+            app.handle().plugin(tauri_plugin_fs::init())?;
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
