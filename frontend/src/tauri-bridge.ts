@@ -7,7 +7,7 @@
 
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
+import { save, open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 
 // ---------------------------------------------------------------------------
@@ -114,6 +114,21 @@ export function readTextFile(path: string): Promise<string> {
 export async function readBinaryFile(path: string): Promise<Uint8Array> {
   const bytes = await invoke<number[]>("read_binary_file", { path });
   return new Uint8Array(bytes);
+}
+
+/**
+ * PDF 파일 열기 다이얼로그를 표시하고 선택한 파일을 읽어 반환한다.
+ * 취소 시 null을 반환한다.
+ */
+export async function openPdfFile(): Promise<{ buffer: ArrayBuffer; name: string; path: string } | null> {
+  const path = await dialogOpen({
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+    multiple: false,
+  });
+  if (!path || typeof path !== "string") return null;
+  const name = path.split(/[\\/]/).pop() ?? path;
+  const bytes = await readBinaryFile(path);
+  return { buffer: bytes.buffer as ArrayBuffer, name, path };
 }
 
 /**

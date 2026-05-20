@@ -12,8 +12,61 @@ import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
 import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
+import { openPdfFile } from "./tauri-bridge";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+// ---------------------------------------------------------------------------
+// Recent files (localStorage)
+// ---------------------------------------------------------------------------
+
+const RECENT_KEY = "recentPdfs";
+const RECENT_MAX = 5;
+
+interface RecentFile { name: string; path: string; }
+
+function getRecentFiles(): RecentFile[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+  } catch { return []; }
+}
+
+function addRecentFile(name: string, path: string): void {
+  const list = getRecentFiles().filter((r) => r.path !== path);
+  list.unshift({ name, path });
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+  renderRecentFiles();
+}
+
+function renderRecentFiles(): void {
+  const el = document.getElementById("pdf-recent-list");
+  if (!el) return;
+  const list = getRecentFiles();
+  if (list.length === 0) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `<p class="pdf-recent-label">최근 파일</p>` +
+    list.map((r) =>
+      `<button class="pdf-recent-item" data-path="${encodeURIComponent(r.path)}" title="${r.path}">${r.name}</button>`
+    ).join("");
+  el.querySelectorAll<HTMLButtonElement>(".pdf-recent-item").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const path = decodeURIComponent(btn.dataset.path ?? "");
+      if (!path) return;
+      const { readBinaryFile } = await import("./tauri-bridge");
+      try {
+        const bytes = await readBinaryFile(path);
+        const name = path.split(/[\\/]/).pop() ?? path;
+        await openBuffer(bytes.buffer as ArrayBuffer, name);
+        currentPdfName = name;
+        currentPdfBuffer = bytes.buffer as ArrayBuffer;
+        addRecentFile(name, path);
+      } catch {
+        btn.textContent = `⚠ ${btn.textContent} (파일 없음)`;
+        btn.disabled = true;
+      }
+    });
+  });
+}
 
 // 뷰어에 렌더링할 최대 페이지 수. 초과분은 DOM에 추가하지 않는다.
 // 변환(서버 처리)은 전체 페이지를 그대로 전송하므로 영향 없음.
@@ -55,11 +108,15 @@ export function mountPdfViewer(container: HTMLElement): void {
             <polyline points="9 15 12 12 15 15"/>
           </svg>
           <p>PDF 파일을 여기에 드롭하거나</p>
-          <label class="pdf-open-btn">
-            파일 선택
-            <input type="file" accept="application/pdf" style="display:none" id="pdf-file-input" />
-          </label>
+          <div class="pdf-open-row">
+            <button class="pdf-open-btn-dialog" id="pdf-open-dialog-btn">파일 열기</button>
+            <label class="pdf-open-btn">
+              드래그 선택
+              <input type="file" accept="application/pdf" style="display:none" id="pdf-file-input" />
+            </label>
+          </div>
         </div>
+        <div class="pdf-recent-list" id="pdf-recent-list" style="display:none"></div>
       </div>
       <div class="pdf-toolbar" id="pdf-toolbar" style="display:none">
         <span class="pdf-filename" id="pdf-filename"></span>
@@ -88,6 +145,8 @@ export function mountPdfViewer(container: HTMLElement): void {
   registerDragAndDrop(container);
   registerFileInput(container);
   registerModeWarning();
+  registerOpenDialog();
+  renderRecentFiles();
 
   document.getElementById("pdf-convert-btn")?.addEventListener("click", () => {
     convertHandler?.();
@@ -373,6 +432,17 @@ function registerDragAndDrop(container: HTMLElement): void {
     container.querySelector(".pdf-dropzone")?.classList.remove("drag-over");
     const file = e.dataTransfer?.files[0];
     if (file && isPdf(file)) loadPdf(file);
+  });
+}
+
+function registerOpenDialog(): void {
+  document.getElementById("pdf-open-dialog-btn")?.addEventListener("click", async () => {
+    const result = await openPdfFile();
+    if (!result) return;
+    currentPdfName = result.name;
+    currentPdfBuffer = result.buffer;
+    addRecentFile(result.name, result.path);
+    await openBuffer(result.buffer, result.name);
   });
 }
 

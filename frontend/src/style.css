@@ -317,6 +317,61 @@ body,
   cursor: default;
 }
 
+/* 최근 파일 목록 */
+.pdf-open-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pdf-open-btn-dialog {
+  padding: 6px 16px;
+  background: #0e639c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pdf-open-btn-dialog:hover {
+  background: #1177bb;
+}
+
+.pdf-recent-list {
+  border-top: 1px solid #333;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.pdf-recent-label {
+  font-size: 11px;
+  color: #666;
+  margin: 0 0 4px 0;
+}
+
+.pdf-recent-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 6px;
+  background: transparent;
+  color: #aaa;
+  border: none;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-recent-item:hover {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
 /* 페이지 네비게이션 */
 .pdf-page-nav {
   display: flex;
