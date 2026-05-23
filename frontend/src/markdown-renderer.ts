@@ -78,8 +78,8 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
           <button class="mdt-tab" id="md-tab-split">Split</button>
         </div>
         <span class="mdt-spacer"></span>
-        <button class="md-btn" id="${ID.copyBtn}" title="클립보드에 복사">Copy</button>
-        <button class="md-btn" id="${ID.saveBtn}" title="마크다운 파일로 저장">Save</button>
+        <button class="md-btn" id="${ID.copyBtn}" title="클립보드에 복사">Copy <kbd>⌘C</kbd></button>
+        <button class="md-btn" id="${ID.saveBtn}" title="마크다운 파일로 저장">Save <kbd>⌘S</kbd></button>
       </div>
       <div class="md-help-bar">
         <button class="md-settings-btn" id="md-settings-btn" title="설정">⚙</button>
