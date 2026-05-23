@@ -37,17 +37,20 @@ const ID = {
   toolbar: "md-toolbar",
   copyBtn: "md-copy-btn",
   saveBtn: "md-save-btn",
-  rawBtn: "md-raw-btn",
   content: "md-content",
+  previewPane: "md-preview-pane",
+  sourcePane: "md-source-pane",
   placeholder: "md-placeholder",
 } as const;
+
+type ViewMode = "preview" | "source" | "split";
 
 // ---------------------------------------------------------------------------
 // Internal state
 // ---------------------------------------------------------------------------
 
 let rawMarkdown = "";
-let showRaw = false;
+let viewMode: ViewMode = "preview";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -58,7 +61,12 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
   container.innerHTML = `
     <div class="md-renderer" id="${ID.root}">
       <div class="md-toolbar" id="${ID.toolbar}" style="display:none">
-        <button class="md-btn" id="${ID.rawBtn}" title="원문 보기">Raw</button>
+        <div class="mdt-tabs">
+          <button class="mdt-tab active" id="md-tab-preview">Preview</button>
+          <button class="mdt-tab" id="md-tab-source">Source</button>
+          <button class="mdt-tab" id="md-tab-split">Split</button>
+        </div>
+        <span class="mdt-spacer"></span>
         <button class="md-btn" id="${ID.copyBtn}" title="클립보드에 복사">Copy</button>
         <button class="md-btn" id="${ID.saveBtn}" title="마크다운 파일로 저장">Save</button>
       </div>
@@ -69,13 +77,18 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
       <div class="md-placeholder" id="${ID.placeholder}">
         <p>PDF를 열고 변환하면<br>Markdown이 여기 표시됩니다.</p>
       </div>
-      <div class="md-content" id="${ID.content}" style="display:none"></div>
+      <div class="md-content mode-preview" id="${ID.content}" style="display:none">
+        <div class="md-preview-pane" id="${ID.previewPane}"></div>
+        <div class="md-source-pane"  id="${ID.sourcePane}"  style="display:none"></div>
+      </div>
     </div>
   `;
 
   document.getElementById(ID.copyBtn)?.addEventListener("click", handleCopy);
   document.getElementById(ID.saveBtn)?.addEventListener("click", handleSave);
-  document.getElementById(ID.rawBtn)?.addEventListener("click", handleToggleRaw);
+  document.getElementById("md-tab-preview")?.addEventListener("click", () => setViewMode("preview"));
+  document.getElementById("md-tab-source")?.addEventListener("click", () => setViewMode("source"));
+  document.getElementById("md-tab-split")?.addEventListener("click", () => setViewMode("split"));
 }
 
 /** 도움말(?) 버튼 클릭 핸들러를 등록한다. main.ts에서 showOnboarding을 연결한다. */
@@ -94,7 +107,6 @@ export function setSettingsHandler(cb: () => void): void {
  */
 export function setMarkdown(md: string): void {
   rawMarkdown = md;
-  showRaw = false;
   renderContent();
   showPanel();
 }
@@ -112,24 +124,28 @@ export function appendMarkdown(chunk: string): void {
 /** 렌더러를 초기 빈 상태로 리셋한다. */
 export function clearMarkdown(): void {
   rawMarkdown = "";
-  showRaw = false;
+  viewMode = "preview";
   const content = document.getElementById(ID.content) as HTMLElement | null;
+  const previewPane = document.getElementById(ID.previewPane) as HTMLElement | null;
+  const sourcePane = document.getElementById(ID.sourcePane) as HTMLElement | null;
   const placeholder = document.getElementById(ID.placeholder) as HTMLElement | null;
   const toolbar = document.getElementById(ID.toolbar) as HTMLElement | null;
-  if (content) { content.innerHTML = ""; content.style.display = "none"; }
+  if (content) {
+    content.style.display = "none";
+    content.className = "md-content mode-preview";
+  }
+  if (previewPane) previewPane.innerHTML = "";
+  if (sourcePane) { sourcePane.innerHTML = ""; sourcePane.style.display = "none"; }
   if (placeholder) placeholder.style.display = "flex";
   if (toolbar) toolbar.style.display = "none";
+  updateTabActive();
 }
 
 /** 스트리밍 중임을 나타내는 커서를 추가/제거한다. */
 export function setStreaming(active: boolean): void {
-  const content = document.getElementById(ID.content);
-  if (!content) return;
-  if (active) {
-    content.classList.add("streaming");
-  } else {
-    content.classList.remove("streaming");
-  }
+  const pane = document.getElementById(ID.previewPane);
+  if (!pane) return;
+  pane.classList.toggle("streaming", active);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,20 +153,22 @@ export function setStreaming(active: boolean): void {
 // ---------------------------------------------------------------------------
 
 function renderContent(): void {
-  const content = document.getElementById(ID.content) as HTMLElement | null;
-  if (!content) return;
+  const previewPane = document.getElementById(ID.previewPane) as HTMLElement | null;
+  const sourcePane = document.getElementById(ID.sourcePane) as HTMLElement | null;
 
-  if (showRaw) {
-    content.innerHTML = `<pre class="md-raw">${escapeHtml(rawMarkdown)}</pre>`;
-  } else {
-    content.innerHTML = marked.parse(rawMarkdown) as string;
-    renderMathInElement(content, {
+  if (viewMode !== "source" && previewPane) {
+    previewPane.innerHTML = marked.parse(rawMarkdown) as string;
+    renderMathInElement(previewPane, {
       delimiters: [
         { left: "$$", right: "$$", display: true },
         { left: "$", right: "$", display: false },
       ],
       throwOnError: false,
     });
+  }
+
+  if (viewMode !== "preview" && sourcePane) {
+    sourcePane.innerHTML = `<pre class="md-raw">${escapeHtml(rawMarkdown)}</pre>`;
   }
 }
 
@@ -159,8 +177,12 @@ function showPanel(): void {
   const content = document.getElementById(ID.content) as HTMLElement | null;
   const placeholder = document.getElementById(ID.placeholder) as HTMLElement | null;
   if (toolbar) toolbar.style.display = "flex";
-  if (content) content.style.display = "block";
+  if (content) {
+    content.style.display = "block";
+    applyViewMode();
+  }
   if (placeholder) placeholder.style.display = "none";
+  updateTabActive();
 }
 
 function handleCopy(): void {
@@ -209,11 +231,28 @@ async function handleSave(): Promise<void> {
   }
 }
 
-function handleToggleRaw(): void {
-  showRaw = !showRaw;
-  const btn = document.getElementById(ID.rawBtn) as HTMLButtonElement | null;
-  if (btn) btn.classList.toggle("active", showRaw);
+function setViewMode(mode: ViewMode): void {
+  viewMode = mode;
+  updateTabActive();
+  applyViewMode();
   renderContent();
+}
+
+function updateTabActive(): void {
+  (["preview", "source", "split"] as ViewMode[]).forEach((m) => {
+    document.getElementById(`md-tab-${m}`)?.classList.toggle("active", m === viewMode);
+  });
+}
+
+function applyViewMode(): void {
+  const content = document.getElementById(ID.content) as HTMLElement | null;
+  const previewPane = document.getElementById(ID.previewPane) as HTMLElement | null;
+  const sourcePane = document.getElementById(ID.sourcePane) as HTMLElement | null;
+  if (!content || !previewPane || !sourcePane) return;
+
+  content.className = `md-content mode-${viewMode}`;
+  previewPane.style.display = viewMode !== "source" ? "block" : "none";
+  sourcePane.style.display  = viewMode !== "preview" ? "block" : "none";
 }
 
 function escapeHtml(text: string): string {
