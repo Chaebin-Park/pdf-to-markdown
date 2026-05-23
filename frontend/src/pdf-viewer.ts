@@ -10,7 +10,7 @@
 
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
-import { refreshBBoxOverlay, clearBBox } from "./bbox-overlay";
+import { refreshBBoxOverlay, clearBBox, toggleOrderOverlay } from "./bbox-overlay";
 import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
 import { openPdfFile } from "./tauri-bridge";
 
@@ -87,6 +87,8 @@ let resizeObserver: ResizeObserver | null = null;
 let renderVersion = 0; // 재렌더링 시 이전 작업 취소용
 let convertHandler: (() => void) | null = null;
 let cancelHandler: (() => void) | null = null;
+let zoomLevel = 1.0;
+const ZOOM_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -125,6 +127,15 @@ export function mountPdfViewer(container: HTMLElement): void {
           <span class="pdf-page-total" id="pdf-page-total">/ 1</span>
           <button class="pdf-page-nav-btn" id="pdf-page-next" title="다음 페이지">›</button>
         </div>
+        <div class="ptb-zoom" id="ptb-zoom" style="display:none">
+          <button class="ptb-btn" id="pdf-zoom-out" title="축소">−</button>
+          <button class="ptb-zoom-label" id="pdf-zoom-fit" title="너비 맞춤">100%</button>
+          <button class="ptb-btn" id="pdf-zoom-in" title="확대">+</button>
+        </div>
+        <span class="ptb-spacer"></span>
+        <button class="ptb-toggle-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
+        <button class="ptb-toggle-btn" id="pdf-order-btn" title="읽기 순서 표시" style="display:none">Order</button>
+        <span class="ptb-sep"></span>
         <div class="pdf-mode-group">
           <select class="pdf-mode-select" id="pdf-mode-select" title="변환 모드 선택">
             <option value="STANDARD">Standard</option>
@@ -144,7 +155,6 @@ export function mountPdfViewer(container: HTMLElement): void {
           </span>
         </div>
         <span class="pdf-mode-warning" id="pdf-mode-warning" style="display:none" title="docling-serve가 준비되지 않았습니다. 설정에서 Hybrid 모드를 설치하세요.">⚠</span>
-        <button class="pdf-bbox-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
       </div>
       <div class="pdf-pages" id="pdf-pages" style="display:none"></div>
     </div>
@@ -154,6 +164,7 @@ export function mountPdfViewer(container: HTMLElement): void {
   registerFileInput(container);
   registerModeWarning();
   registerOpenDialog();
+  initZoomControls();
   renderRecentFiles();
 
   document.getElementById("pdf-convert-btn")?.addEventListener("click", () => {
@@ -188,14 +199,23 @@ export function getSelectedMode(): string {
  * 변환 완료 후 jsonPath가 있으면 main.ts에서 호출한다.
  */
 export function setBBoxAvailable(available: boolean, onToggle?: () => void): void {
-  const btn = document.getElementById("pdf-bbox-btn") as HTMLButtonElement | null;
-  if (!btn) return;
-  btn.style.display = available ? "inline-block" : "none";
+  const bboxBtn = document.getElementById("pdf-bbox-btn") as HTMLButtonElement | null;
+  const orderBtn = document.getElementById("pdf-order-btn") as HTMLButtonElement | null;
+  if (!bboxBtn) return;
+
+  bboxBtn.style.display = available ? "inline-flex" : "none";
+  if (orderBtn) orderBtn.style.display = available ? "inline-flex" : "none";
+
   if (available && onToggle) {
-    btn.onclick = () => {
-      const active = btn.classList.toggle("active");
-      btn.textContent = active ? "BBox ON" : "BBox";
+    bboxBtn.onclick = () => {
+      bboxBtn.classList.toggle("active");
       onToggle();
+    };
+  }
+  if (available && orderBtn) {
+    orderBtn.onclick = () => {
+      orderBtn.classList.toggle("active");
+      toggleOrderOverlay();
     };
   }
 }
@@ -244,6 +264,12 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   toolbar.style.display = "flex";
   pages.style.display = "block";
   pages.innerHTML = "";
+
+  zoomLevel = 1.0;
+  const zoomGroup = document.getElementById("ptb-zoom") as HTMLElement | null;
+  const zoomFitBtn = document.getElementById("pdf-zoom-fit") as HTMLButtonElement | null;
+  if (zoomGroup) zoomGroup.style.display = "flex";
+  if (zoomFitBtn) zoomFitBtn.textContent = "100%";
 
   // 로딩 스피너
   pages.innerHTML = `<div class="pdf-loading">
@@ -343,7 +369,7 @@ async function rerenderAll(doc: PDFDocumentProxy, version: number): Promise<void
 
 function buildCanvas(page: PDFPageProxy, containerWidth: number): HTMLCanvasElement {
   const baseViewport = page.getViewport({ scale: 1 });
-  const scale = Math.max(0.5, containerWidth / baseViewport.width);
+  const scale = Math.max(0.5, (containerWidth * zoomLevel) / baseViewport.width);
   const viewport = page.getViewport({ scale });
 
   const canvas = document.createElement("canvas");
@@ -472,6 +498,31 @@ function registerFileInput(container: HTMLElement): void {
 /** MIME 타입 또는 확장자로 PDF 파일 여부를 판정한다. */
 function isPdf(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+// ---------------------------------------------------------------------------
+// Zoom controls
+// ---------------------------------------------------------------------------
+
+function initZoomControls(): void {
+  document.getElementById("pdf-zoom-in")?.addEventListener("click", () => {
+    const idx = ZOOM_STEPS.indexOf(zoomLevel);
+    if (idx < ZOOM_STEPS.length - 1) applyZoom(ZOOM_STEPS[idx + 1]);
+  });
+  document.getElementById("pdf-zoom-out")?.addEventListener("click", () => {
+    const idx = ZOOM_STEPS.indexOf(zoomLevel);
+    if (idx > 0) applyZoom(ZOOM_STEPS[idx - 1]);
+  });
+  document.getElementById("pdf-zoom-fit")?.addEventListener("click", () => {
+    applyZoom(1.0);
+  });
+}
+
+function applyZoom(level: number): void {
+  zoomLevel = level;
+  const label = document.getElementById("pdf-zoom-fit") as HTMLButtonElement | null;
+  if (label) label.textContent = `${Math.round(level * 100)}%`;
+  if (pdfDoc) rerenderAll(pdfDoc, renderVersion);
 }
 
 /**

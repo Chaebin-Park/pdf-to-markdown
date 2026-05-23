@@ -61,6 +61,9 @@ const DEFAULT_FILL = "rgba(200,200,200,0.1)";
 
 let items: BBoxItem[] = [];
 let visible = false;
+let orderVisible = false;
+
+const TOP_LEVEL_TYPES = new Set(["paragraph", "heading", "table", "list", "image", "formula"]);
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -99,15 +102,23 @@ export function toggleBBoxOverlay(): boolean {
   return visible;
 }
 
+/** 읽기 순서 chip 오버레이 토글. */
+export function toggleOrderOverlay(): boolean {
+  orderVisible = !orderVisible;
+  renderOverlays();
+  return orderVisible;
+}
+
 /** PDF 재렌더링 후 오버레이를 갱신한다 (ResizeObserver 콜백 등에서 사용). */
 export function refreshBBoxOverlay(): void {
-  if (visible) renderOverlays();
+  if (visible || orderVisible) renderOverlays();
 }
 
 /** 모든 bbox 데이터와 오버레이를 초기화한다. */
 export function clearBBox(): void {
   items = [];
   visible = false;
+  orderVisible = false;
   clearOverlays();
 }
 
@@ -117,7 +128,7 @@ export function clearBBox(): void {
 
 function renderOverlays(): void {
   clearOverlays();
-  if (!visible || items.length === 0) return;
+  if ((!visible && !orderVisible) || items.length === 0) return;
 
   // 페이지별로 그룹화
   const byPage = new Map<number, BBoxItem[]>();
@@ -150,6 +161,7 @@ function renderOverlays(): void {
     layer.className = "bbox-layer";
     layer.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;pointer-events:none;`;
 
+    let orderIdx = 0;
     for (const item of pageItems) {
       const [lx, by, rx, ty] = item.bbox;
       const x = (lx / pageW) * canvasW;
@@ -158,21 +170,32 @@ function renderOverlays(): void {
       const h = ((ty - by) / pageH) * canvasH;
       if (w <= 0 || h <= 0) continue;
 
-      const fill = TYPE_FILL[item.type] ?? DEFAULT_FILL;
-      const border = fill.replace(/[\d.]+\)$/, "0.55)");
+      if (visible) {
+        const fill = TYPE_FILL[item.type] ?? DEFAULT_FILL;
+        const border = fill.replace(/[\d.]+\)$/, "0.55)");
+        const rect = document.createElement("div");
+        rect.className = "bbox-rect";
+        rect.dataset.bboxType = item.type;
+        rect.title = `[${item.type}] ${item.content.slice(0, 120)}`;
+        rect.style.cssText = `
+          position:absolute;
+          left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;
+          width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;
+          background:${fill};border:1px solid ${border};
+          box-sizing:border-box;pointer-events:auto;cursor:default;
+        `;
+        layer.appendChild(rect);
+      }
 
-      const rect = document.createElement("div");
-      rect.className = "bbox-rect";
-      rect.dataset.bboxType = item.type;
-      rect.title = `[${item.type}] ${item.content.slice(0, 120)}`;
-      rect.style.cssText = `
-        position:absolute;
-        left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;
-        width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;
-        background:${fill};border:1px solid ${border};
-        box-sizing:border-box;pointer-events:auto;cursor:default;
-      `;
-      layer.appendChild(rect);
+      if (orderVisible && TOP_LEVEL_TYPES.has(item.type)) {
+        orderIdx++;
+        const chip = document.createElement("div");
+        chip.className = "order-chip";
+        chip.textContent = String(orderIdx);
+        chip.title = `#${orderIdx} [${item.type}] ${item.content.slice(0, 80)}`;
+        chip.style.cssText = `position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;`;
+        layer.appendChild(chip);
+      }
     }
 
     wrapper.appendChild(layer);
