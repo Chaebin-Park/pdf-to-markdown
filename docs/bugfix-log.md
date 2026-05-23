@@ -49,6 +49,29 @@
 
 ---
 
+---
+
+## 2026-05-18 — Phase 6 마무리 UX 버그 수정
+
+### BUG-05 설치 완료 후 Hybrid 모드 즉시 사용 불가
+**증상**: docling-serve 설치 완료 후 앱 재시작 없이 Hybrid 모드 변환을 시도하면 ⚠ 경고 아이콘이 계속 표시되고, 변환 요청이 docling-serve로 라우팅되지 않음  
+**원인**: `settings.ts`의 `markInstallComplete()`가 UI 상태만 갱신하고 `startDoclingServe()` / `setDoclingReady(true)`를 호출하지 않아 docling 상태가 초기화되지 않음  
+**수정**:
+- `markInstallComplete()`를 `async`로 변경
+- `onDoclingReady` 구독 후 `startDoclingServe()` 호출 → `docling-ready` 이벤트 수신 시 `setDoclingReady(true)` 반영
+- `startInstall()`에서 `await markInstallComplete()` 로 변경  
+**커밋**: `a26dfc5`
+
+---
+
+### BUG-06 설정 모달 제거 버튼 — 동적 HTML 교체 후 클릭 무응답
+**증상**: 설치 완료 → `markInstallComplete()`가 `installArea.innerHTML`을 교체 → "제거" 버튼이 렌더링되나 클릭해도 아무 반응 없음  
+**원인**: 기존 코드가 `document.getElementById("hybrid-install-btn")?.addEventListener(...)` 방식으로 직접 핸들러를 등록했기 때문에, innerHTML 교체로 새로 생성된 DOM 요소에는 핸들러가 없음  
+**수정**: `settings-install-area` 요소에 이벤트 위임(event delegation) 방식으로 변경. 설치/제거 버튼 모두 `target.id` 로 분기  
+**커밋**: `18a80f1`
+
+---
+
 ## 수정 후 동작 확인
 
 | 항목 | 상태 |
