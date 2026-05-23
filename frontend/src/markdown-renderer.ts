@@ -26,7 +26,18 @@ renderer.code = ({ text, lang }) => {
   return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
 };
 
+// 헤딩: Outline 패널 앵커 링크용 id 추가
+renderer.heading = ({ text, depth }) => {
+  const id = slugify(text);
+  return `<h${depth} id="${id}">${text}</h${depth}>\n`;
+};
+
 marked.setOptions({ renderer });
+
+/** 헤딩 텍스트를 DOM id로 변환한다. */
+export function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-");
+}
 
 // ---------------------------------------------------------------------------
 // DOM IDs
@@ -100,6 +111,9 @@ export function setHelpHandler(cb: () => void): void {
 export function setSettingsHandler(cb: () => void): void {
   document.getElementById("md-settings-btn")?.addEventListener("click", cb);
 }
+
+/** 현재 로드된 raw Markdown 텍스트를 반환한다. */
+export function getRawMarkdown(): string { return rawMarkdown; }
 
 /**
  * Markdown 텍스트를 설정하고 렌더링한다.
