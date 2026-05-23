@@ -23,50 +23,49 @@ export function mountOutlinePanel(container: HTMLElement): void {
     </button>`;
   }).join("");
 
-  container.querySelectorAll<HTMLButtonElement>(".op-item").forEach((btn) => {
+  const pane = document.getElementById("md-preview-pane");
+  container.querySelectorAll<HTMLButtonElement>(".op-item").forEach((btn, i) => {
     btn.addEventListener("click", () => {
-      const target = document.getElementById(btn.dataset.id ?? "");
+      if (!pane) return;
+      const allHeadings = pane.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6");
+      const target = allHeadings[i];
       if (!target) return;
-      const pane = document.getElementById("md-preview-pane");
-      if (pane) {
-        const paneTop = pane.getBoundingClientRect().top;
-        const targetTop = target.getBoundingClientRect().top;
-        pane.scrollTop += targetTop - paneTop - 16;
-      } else {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      const paneTop = pane.getBoundingClientRect().top;
+      const targetTop = target.getBoundingClientRect().top;
+      pane.scrollTop += targetTop - paneTop - 16;
     });
   });
 
-  initActiveHighlight(container, headings);
+  initActiveHighlight(container);
 }
 
-function initActiveHighlight(container: HTMLElement, headings: Heading[]): void {
+function initActiveHighlight(container: HTMLElement): void {
   const pane = document.getElementById("md-preview-pane");
   if (!pane) return;
 
-  const setActive = (id: string) => {
-    container.querySelectorAll<HTMLButtonElement>(".op-item").forEach((btn) => {
-      btn.classList.toggle("op-active", btn.dataset.id === id);
-    });
+  const allHeadings = Array.from(pane.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6"));
+  if (allHeadings.length === 0) return;
+
+  const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>(".op-item"));
+
+  const setActive = (idx: number) => {
+    buttons.forEach((btn, i) => btn.classList.toggle("op-active", i === idx));
   };
 
-  // 현재 뷰포트 상단에 가장 가까운 헤딩을 활성화
   observer = new IntersectionObserver(
     (entries) => {
-      // 뷰포트 안에 들어온 헤딩 중 가장 위쪽 항목을 활성
       const visible = entries
         .filter((e) => e.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (visible.length > 0) setActive(visible[0].target.id);
+      if (visible.length > 0) {
+        const idx = allHeadings.indexOf(visible[0].target as HTMLElement);
+        if (idx !== -1) setActive(idx);
+      }
     },
     { root: pane, threshold: 0, rootMargin: "0px 0px -80% 0px" },
   );
 
-  headings.forEach((h) => {
-    const el = pane.querySelector(`#${CSS.escape(h.id)}`);
-    if (el) observer!.observe(el);
-  });
+  allHeadings.forEach((el) => observer!.observe(el));
 }
 
 function parseHeadings(md: string): Heading[] {
