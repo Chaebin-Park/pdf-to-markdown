@@ -82,11 +82,16 @@ object Converter {
                 ConvertMode.HYBRID -> {
                     hybrid = Config.HYBRID_DOCLING_FAST
                 }
+                ConvertMode.HYBRID_FULL -> {
+                    // 10-2: 모든 페이지를 AI로 처리 — 표 정확도 0.489 → 0.928
+                    hybrid = Config.HYBRID_DOCLING_FAST
+                    hybridConfig.mode = HybridConfig.MODE_FULL
+                }
                 ConvertMode.OCR, ConvertMode.FORMULA -> {
                     hybrid = Config.HYBRID_DOCLING_FAST
                     hybridConfig.mode = HybridConfig.MODE_FULL
                 }
-                else -> { /* Java 파서만 실행 */ }
+                ConvertMode.STANDARD -> { /* Java 파서만 실행 */ }
             }
         }
 }

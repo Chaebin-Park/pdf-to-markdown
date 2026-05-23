@@ -131,6 +131,7 @@ export function mountPdfViewer(container: HTMLElement): void {
           <select class="pdf-mode-select" id="pdf-mode-select" title="변환 모드 선택">
             <option value="STANDARD">Standard</option>
             <option value="HYBRID">Hybrid AI</option>
+            <option value="HYBRID_FULL">Table Quality</option>
             <option value="OCR">OCR</option>
             <option value="FORMULA">Formula</option>
           </select>
@@ -138,6 +139,7 @@ export function mountPdfViewer(container: HTMLElement): void {
             <span class="pdf-mode-tooltip">
               <b>Standard</b> — 빠른 텍스트 추출. 일반 문서에 적합.<br>
               <b>Hybrid AI</b> — AI 레이아웃 분석. 복잡한 논문·보고서 (설치 필요).<br>
+              <b>Table Quality</b> — 전 페이지 AI 처리. 표 정확도 최대화 (설치 필요).<br>
               <b>OCR</b> — 스캔 PDF 텍스트 추출 (설치 필요).<br>
               <b>Formula</b> — 수식 포함 논문 전용, LaTeX 추출 (설치 필요).
             </span>

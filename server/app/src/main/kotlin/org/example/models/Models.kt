@@ -3,7 +3,7 @@ package org.example.models
 import kotlinx.serialization.Serializable
 
 /** PDF 변환 모드. */
-enum class ConvertMode { STANDARD, HYBRID, OCR, FORMULA }
+enum class ConvertMode { STANDARD, HYBRID, HYBRID_FULL, OCR, FORMULA }
 
 /** 변환 작업의 실행 상태. */
 enum class JobStatus { PENDING, RUNNING, DONE, ERROR }
