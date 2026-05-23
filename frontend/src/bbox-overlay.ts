@@ -64,6 +64,40 @@ let items: BBoxItem[] = [];
 let visible = false;
 let orderVisible = false;
 
+// ---------------------------------------------------------------------------
+// Floating tooltip
+// ---------------------------------------------------------------------------
+
+let tooltipEl: HTMLDivElement | null = null;
+
+function getTooltip(): HTMLDivElement {
+  if (!tooltipEl) {
+    tooltipEl = document.createElement("div");
+    tooltipEl.id = "bbox-tooltip";
+    tooltipEl.style.cssText =
+      "position:fixed;background:rgba(20,20,20,0.88);color:#e8e8e8;font-size:11px;" +
+      "font-family:monospace;padding:3px 8px;border-radius:4px;pointer-events:none;" +
+      "display:none;z-index:9999;white-space:nowrap;";
+    document.body.appendChild(tooltipEl);
+  }
+  return tooltipEl;
+}
+
+function attachTooltip(el: HTMLDivElement, label: string): void {
+  const tip = getTooltip();
+  el.addEventListener("mouseenter", () => {
+    tip.textContent = label;
+    tip.style.display = "block";
+  });
+  el.addEventListener("mousemove", (e: MouseEvent) => {
+    tip.style.left = `${e.clientX + 14}px`;
+    tip.style.top = `${e.clientY - 28}px`;
+  });
+  el.addEventListener("mouseleave", () => {
+    tip.style.display = "none";
+  });
+}
+
 const TOP_LEVEL_TYPES = new Set(["paragraph", "heading", "table", "list", "image", "formula"]);
 
 // ---------------------------------------------------------------------------
@@ -177,7 +211,8 @@ function renderOverlays(): void {
         const rect = document.createElement("div");
         rect.className = "bbox-rect";
         rect.dataset.bboxType = item.type;
-        rect.title = item.meta ? `${item.type} · ${item.meta}` : `${item.type} · ${item.content.slice(0, 100)}`;
+        const label = item.meta ? `${item.type} · ${item.meta}` : `${item.type} · ${item.content.slice(0, 100)}`;
+        attachTooltip(rect, label);
         rect.style.cssText = `
           position:absolute;
           left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;
