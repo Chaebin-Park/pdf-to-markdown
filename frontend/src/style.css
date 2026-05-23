@@ -354,6 +354,11 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.op-item.op-active {
+  background: var(--ink-2);
+  color: var(--coral);
+}
+.op-item.op-active .op-level { color: var(--coral); }
 
 .layout {
   display: flex;
