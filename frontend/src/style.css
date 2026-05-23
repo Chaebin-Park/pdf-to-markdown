@@ -262,6 +262,69 @@ body {
   text-align: center;
 }
 
+/* Files panel */
+.fp-section { padding: 8px 10px; }
+.fp-section + .fp-section { border-top: 1px solid var(--line); }
+.fp-open-btn {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--ink-2);
+  border: none;
+  border-radius: 5px;
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fp-open-btn:hover { background: var(--ink-3); }
+.fp-open-btn kbd {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--mute-2);
+  font-family: var(--mono);
+}
+.fp-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mute-2);
+  padding: 4px 2px 6px;
+  margin: 0;
+}
+.fp-file-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 6px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+.fp-file-item:hover { background: var(--ink-2); }
+.fp-file-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.fp-icon { flex-shrink: 0; color: var(--mute-2); }
+.fp-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fp-empty {
+  font-size: 12px;
+  color: var(--mute-2);
+  padding: 12px 2px;
+  margin: 0;
+}
+
 .layout {
   display: flex;
   flex: 1;

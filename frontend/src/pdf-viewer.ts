@@ -25,10 +25,21 @@ const RECENT_MAX = 5;
 
 interface RecentFile { name: string; path: string; }
 
-function getRecentFiles(): RecentFile[] {
+export function getRecentFiles(): RecentFile[] {
   try {
     return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
   } catch { return []; }
+}
+
+/** 경로로 PDF를 직접 열고 최근 파일 목록을 갱신한다. */
+export async function openPdfFromPath(path: string): Promise<void> {
+  const { readBinaryFile } = await import("./tauri-bridge");
+  const bytes = await readBinaryFile(path);
+  const name = path.split(/[\\/]/).pop() ?? path;
+  currentPdfBuffer = bytes.buffer as ArrayBuffer;
+  currentPdfName = name;
+  addRecentFile(name, path);
+  await openBuffer(bytes.buffer as ArrayBuffer, name);
 }
 
 function addRecentFile(name: string, path: string): void {

@@ -17,6 +17,8 @@ import { initTheme } from "./theme";
 import { setDoclingReady } from "./docling-state";
 import { checkForUpdates } from "./updater";
 import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle } from "./status-bar";
+import { mountFilesPanel } from "./files-panel";
+import { registerPanelContent } from "./activity-rail";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -121,6 +123,9 @@ function renderApp(root: HTMLDivElement): void {
   // 진행률 바는 레이아웃 컨테이너에 마운트 (두 패널 위에 오버레이)
   const layoutEl = root.querySelector<HTMLElement>(".layout")!;
   mountProgressBar(layoutEl);
+
+  // Activity Rail 패널 콘텐츠 등록
+  registerPanelContent("files", mountFilesPanel);
 
   // 최초 실행 시 온보딩 모달 표시; ? 버튼으로 재호출 가능
   setHelpHandler(() => showOnboarding());
