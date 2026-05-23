@@ -20,16 +20,39 @@ function getSavedRatio(): number {
   return isNaN(v) ? DEFAULT_LEFT_RATIO : Math.max(0.15, Math.min(0.85, v));
 }
 
-/** 레이아웃 HTML을 #app에 주입하고 리사이저를 활성화한다. */
+/** 레이아웃 HTML을 #app에 주입하고 리사이저와 타이틀바를 활성화한다. */
 export function mountLayout(root: HTMLDivElement): void {
   root.innerHTML = `
+    <div class="app-titlebar" data-tauri-drag-region id="app-titlebar">
+      <div class="titlebar-left">
+        <div class="titlebar-traffic">
+          <button class="tb-btn tb-close"    id="tb-close"    title="닫기"></button>
+          <button class="tb-btn tb-minimize" id="tb-minimize" title="최소화"></button>
+          <button class="tb-btn tb-maximize" id="tb-maximize" title="최대화"></button>
+        </div>
+      </div>
+      <div class="titlebar-center">
+        <span class="titlebar-logo"><span>P</span><span class="logo-slash">/</span><span>M</span></span>
+        <span id="pdf-filename">PDF to Markdown</span>
+        <span id="titlebar-meta">
+          <span id="pdf-pagecount"></span>
+          <span class="titlebar-tagged" id="titlebar-tagged" style="display:none">· ✓ Tagged</span>
+        </span>
+      </div>
+      <div class="titlebar-right">
+        <button class="tb-action" id="tb-open-btn">Open <kbd>⌘O</kbd></button>
+        <button class="pdf-convert-btn" id="pdf-convert-btn" disabled>변환 <kbd>⌘↵</kbd></button>
+        <button class="pdf-cancel-btn"  id="pdf-cancel-btn"  style="display:none">취소</button>
+      </div>
+    </div>
     <div class="layout">
-      <div class="panel panel-left" id="panel-left"></div>
+      <div class="panel panel-left"  id="panel-left"></div>
       <div class="divider" id="divider" title="드래그하여 크기 조절"></div>
       <div class="panel panel-right" id="panel-right"></div>
     </div>
   `;
 
+  initWindowControls();
   initResizer(
     root.querySelector<HTMLDivElement>(".layout")!,
     root.querySelector<HTMLDivElement>(".panel-left")!,
@@ -46,6 +69,22 @@ export function getPanelLeft(): HTMLDivElement {
 /** 우측 패널 컨테이너를 반환한다. */
 export function getPanelRight(): HTMLDivElement {
   return document.getElementById("panel-right") as HTMLDivElement;
+}
+
+// ---------------------------------------------------------------------------
+// Window controls
+// ---------------------------------------------------------------------------
+
+async function initWindowControls(): Promise<void> {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    document.getElementById("tb-close")   ?.addEventListener("click", () => win.close());
+    document.getElementById("tb-minimize")?.addEventListener("click", () => win.minimize());
+    document.getElementById("tb-maximize")?.addEventListener("click", () => win.toggleMaximize());
+  } catch {
+    // browser dev mode — window API unavailable
+  }
 }
 
 // ---------------------------------------------------------------------------

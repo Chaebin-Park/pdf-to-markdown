@@ -12,6 +12,9 @@
     "process:default",
     "dialog:allow-save",
     "dialog:allow-open",
-    "fs:allow-write-text-file"
+    "fs:allow-write-text-file",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize"
   ]
 }

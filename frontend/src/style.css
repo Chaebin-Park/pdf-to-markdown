@@ -24,11 +24,18 @@
 }
 
 html,
-body,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 #app {
   height: 100%;
   width: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   font-family: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--ink-2);
   color: var(--fg);
@@ -131,7 +138,8 @@ body,
 
 .layout {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
   position: relative; /* progress-overlay 기준점 */
@@ -1220,6 +1228,143 @@ body,
   background: #0e639c;
   color: #fff;
   border-color: #0e639c;
+}
+
+/* -------------------------------------------------------------------------
+   App Titlebar (custom window chrome — decorations: false)
+   ---------------------------------------------------------------------- */
+
+.app-titlebar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--ink-3);
+  border-bottom: 1px solid var(--line-solid);
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+}
+
+.titlebar-traffic {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-left: 4px;
+}
+
+.tb-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: filter 0.12s;
+}
+
+.tb-close    { background: #FF5F57; }
+.tb-minimize { background: #FEBC2E; }
+.tb-maximize { background: #28C840; }
+
+.tb-btn:hover  { filter: brightness(1.15); }
+.tb-btn:active { filter: brightness(0.82); }
+
+.titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.titlebar-logo {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--fg);
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.titlebar-logo .logo-slash {
+  color: var(--coral);
+}
+
+#pdf-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+#titlebar-meta {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--mute-2);
+  flex-shrink: 0;
+}
+
+#pdf-pagecount {
+  font-size: 12px;
+  color: var(--mute-2);
+}
+
+.titlebar-tagged {
+  font-size: 11px;
+  padding: 1px 7px;
+  background: rgba(196,100,60,0.12);
+  color: var(--coral);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tb-action {
+  padding: 3px 11px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--line-solid);
+  border-radius: 4px;
+  color: var(--fg-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.tb-action:hover {
+  background: var(--ink-4);
+  border-color: var(--mute);
+  color: var(--fg);
+}
+
+.app-titlebar kbd {
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--mute-2);
+  opacity: 0.8;
 }
 
 /* -------------------------------------------------------------------------

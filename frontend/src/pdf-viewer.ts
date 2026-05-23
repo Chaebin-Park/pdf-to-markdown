@@ -119,8 +119,6 @@ export function mountPdfViewer(container: HTMLElement): void {
         <div class="pdf-recent-list" id="pdf-recent-list" style="display:none"></div>
       </div>
       <div class="pdf-toolbar" id="pdf-toolbar" style="display:none">
-        <span class="pdf-filename" id="pdf-filename"></span>
-        <span class="pdf-pagecount" id="pdf-pagecount" style="display:none"></span>
         <div class="pdf-page-nav" id="pdf-page-nav" style="display:none">
           <button class="pdf-page-nav-btn" id="pdf-page-prev" title="이전 페이지">‹</button>
           <input class="pdf-page-input" id="pdf-page-input" type="number" min="1" value="1" title="페이지 이동" />
@@ -146,8 +144,6 @@ export function mountPdfViewer(container: HTMLElement): void {
           </span>
         </div>
         <span class="pdf-mode-warning" id="pdf-mode-warning" style="display:none" title="docling-serve가 준비되지 않았습니다. 설정에서 Hybrid 모드를 설치하세요.">⚠</span>
-        <button class="pdf-convert-btn" id="pdf-convert-btn" title="Markdown으로 변환">변환</button>
-        <button class="pdf-cancel-btn" id="pdf-cancel-btn" title="변환 취소" style="display:none">취소</button>
         <button class="pdf-bbox-btn" id="pdf-bbox-btn" title="Bounding Box 표시" style="display:none">BBox</button>
       </div>
       <div class="pdf-pages" id="pdf-pages" style="display:none"></div>
@@ -213,7 +209,7 @@ export function setConverting(active: boolean): void {
   const cancelBtn = document.getElementById("pdf-cancel-btn") as HTMLButtonElement | null;
   if (!btn) return;
   btn.disabled = active;
-  btn.textContent = active ? "변환 중…" : "변환";
+  btn.innerHTML = active ? "변환 중…" : '변환 <kbd>⌘↵</kbd>';
   if (cancelBtn) cancelBtn.style.display = active ? "inline-block" : "none";
 }
 
@@ -263,6 +259,12 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   const totalPages = pdfDoc.numPages;
   const previewPages = Math.min(totalPages, PREVIEW_PAGE_LIMIT);
   pagecountEl.textContent = `${totalPages} pages`;
+
+  // 타이틀바 메타 정보 표시 + 변환 버튼 활성화
+  const titlebarMeta = document.getElementById("titlebar-meta");
+  if (titlebarMeta) titlebarMeta.style.display = "flex";
+  const convertBtn = document.getElementById("pdf-convert-btn") as HTMLButtonElement | null;
+  if (convertBtn) convertBtn.disabled = false;
   pages.innerHTML = "";
 
   // 페이지 네비게이션 UI 초기화 (observer는 renderAllPages 이후에 연결)

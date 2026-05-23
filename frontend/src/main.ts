@@ -110,6 +110,11 @@ function renderApp(root: HTMLDivElement): void {
   mountPdfViewer(getPanelLeft());
   mountMarkdownRenderer(getPanelRight());
 
+  // 타이틀바 Open 버튼 → 기존 파일 열기 다이얼로그 위임
+  document.getElementById("tb-open-btn")?.addEventListener("click", () => {
+    document.getElementById("pdf-open-dialog-btn")?.click();
+  });
+
   // 진행률 바는 레이아웃 컨테이너에 마운트 (두 패널 위에 오버레이)
   const layoutEl = root.querySelector<HTMLElement>(".layout")!;
   mountProgressBar(layoutEl);
