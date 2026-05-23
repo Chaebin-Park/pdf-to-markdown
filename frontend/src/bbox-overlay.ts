@@ -35,6 +35,7 @@ interface BBoxItem {
   pageNumber: number;
   bbox: [number, number, number, number]; // [leftX, bottomY, rightX, topY]
   content: string;
+  meta?: string; // 타입별 부가 정보 (예: "8 cols × 10 rows", "level 2")
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +177,7 @@ function renderOverlays(): void {
         const rect = document.createElement("div");
         rect.className = "bbox-rect";
         rect.dataset.bboxType = item.type;
-        rect.title = `[${item.type}] ${item.content.slice(0, 120)}`;
+        rect.title = item.meta ? `${item.type} · ${item.meta}` : `${item.type} · ${item.content.slice(0, 100)}`;
         rect.style.cssText = `
           position:absolute;
           left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;
@@ -218,6 +219,7 @@ function extractItems(elements: RawElement[]): void {
         pageNumber: el["page number"] ?? 1,
         bbox: el["bounding box"]!,
         content: el.content ?? el.type ?? "",
+        meta: buildMeta(el),
       });
     }
     if (el.kids) extractItems(el.kids);
@@ -225,4 +227,22 @@ function extractItems(elements: RawElement[]): void {
     if (el.cells) extractItems(el.cells);
     if (el["list items"]) extractItems(el["list items"]);
   }
+}
+
+function buildMeta(el: RawElement): string | undefined {
+  const type = el.type ?? "";
+  if (type === "table") {
+    const rows = el.rows?.length ?? 0;
+    const cols = el.rows?.[0]?.cells?.length ?? 0;
+    if (rows > 0) return `${cols} cols × ${rows} rows`;
+  }
+  if (type === "heading") {
+    const level = (el.content?.match(/^(#{1,6})\s/) ?? [])[1]?.length;
+    if (level) return `level ${level}`;
+  }
+  if (type === "list") {
+    const count = el["list items"]?.length ?? 0;
+    if (count > 0) return `${count} items`;
+  }
+  return undefined;
 }
