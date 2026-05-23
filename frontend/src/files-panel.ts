@@ -22,12 +22,18 @@ function renderRecentList(el: HTMLElement): void {
     return;
   }
   el.innerHTML = `<p class="fp-section-label">Recent</p>` +
-    list.map((r, i) => `
-      <button class="fp-file-item" data-idx="${i}" title="${r.path}">
-        <svg class="fp-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <span class="fp-name">${r.name}</span>
-      </button>
-    `).join("");
+    list.map((r, i) => {
+      const meta: string[] = [];
+      if (r.pages) meta.push(`${r.pages}p`);
+      if (r.size) meta.push(`${Math.round(r.size / 1024)}KB`);
+      return `
+        <button class="fp-file-item" data-idx="${i}" title="${r.path}">
+          <svg class="fp-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span class="fp-name">${r.name}</span>
+          ${meta.length ? `<span class="fp-meta">${meta.join(" · ")}</span>` : ""}
+        </button>
+      `;
+    }).join("");
 
   el.querySelectorAll<HTMLButtonElement>(".fp-file-item").forEach((btn) => {
     btn.addEventListener("click", async () => {

@@ -23,7 +23,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 const RECENT_KEY = "recentPdfs";
 const RECENT_MAX = 5;
 
-interface RecentFile { name: string; path: string; }
+interface RecentFile { name: string; path: string; pages?: number; size?: number; }
 
 export function getRecentFiles(): RecentFile[] {
   try {
@@ -38,15 +38,25 @@ export async function openPdfFromPath(path: string): Promise<void> {
   const name = path.split(/[\\/]/).pop() ?? path;
   currentPdfBuffer = bytes.buffer as ArrayBuffer;
   currentPdfName = name;
-  addRecentFile(name, path);
+  currentPdfPath = path;
+  addRecentFile(name, path, bytes.byteLength);
   await openBuffer(bytes.buffer as ArrayBuffer, name);
 }
 
-function addRecentFile(name: string, path: string): void {
+function addRecentFile(name: string, path: string, size?: number): void {
   const list = getRecentFiles().filter((r) => r.path !== path);
-  list.unshift({ name, path });
+  list.unshift({ name, path, size });
   localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
   renderRecentFiles();
+}
+
+function updateRecentFileMeta(path: string, pages: number): void {
+  const list = getRecentFiles();
+  const entry = list.find((r) => r.path === path);
+  if (entry) {
+    entry.pages = pages;
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  }
 }
 
 function renderRecentFiles(): void {
@@ -94,6 +104,7 @@ export let currentPdfBuffer: ArrayBuffer | null = null;
 // ---------------------------------------------------------------------------
 
 let pdfDoc: PDFDocumentProxy | null = null;
+let currentPdfPath: string | null = null;
 
 /** 현재 로드된 PDFDocumentProxy. Pages 패널 썸네일 렌더링에 사용. */
 export function getPdfDoc(): PDFDocumentProxy | null { return pdfDoc; }
@@ -299,6 +310,7 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   const totalPages = pdfDoc.numPages;
   const previewPages = Math.min(totalPages, PREVIEW_PAGE_LIMIT);
   pagecountEl.textContent = `${totalPages} pages`;
+  if (currentPdfPath) updateRecentFileMeta(currentPdfPath, totalPages);
 
   // 타이틀바 메타 정보 표시 + 변환 버튼 활성화
   const titlebarMeta = document.getElementById("titlebar-meta");
@@ -495,7 +507,8 @@ function registerOpenDialog(): void {
     if (!result) return;
     currentPdfName = result.name;
     currentPdfBuffer = result.buffer;
-    addRecentFile(result.name, result.path);
+    currentPdfPath = result.path;
+    addRecentFile(result.name, result.path, result.buffer.byteLength);
     await openBuffer(result.buffer, result.name);
   });
 }

@@ -317,6 +317,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+.fp-meta {
+  font-size: 10px;
+  color: var(--mute-2);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .fp-empty {
   font-size: 12px;
