@@ -94,6 +94,9 @@ export let currentPdfBuffer: ArrayBuffer | null = null;
 // ---------------------------------------------------------------------------
 
 let pdfDoc: PDFDocumentProxy | null = null;
+
+/** 현재 로드된 PDFDocumentProxy. Pages 패널 썸네일 렌더링에 사용. */
+export function getPdfDoc(): PDFDocumentProxy | null { return pdfDoc; }
 let resizeObserver: ResizeObserver | null = null;
 let renderVersion = 0; // 재렌더링 시 이전 작업 취소용
 let convertHandler: (() => void) | null = null;

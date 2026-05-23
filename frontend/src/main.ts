@@ -19,6 +19,7 @@ import { checkForUpdates } from "./updater";
 import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle } from "./status-bar";
 import { mountFilesPanel } from "./files-panel";
 import { mountOutlinePanel } from "./outline-panel";
+import { mountPagesPanel } from "./pages-panel";
 import { registerPanelContent } from "./activity-rail";
 
 /**
@@ -127,6 +128,7 @@ function renderApp(root: HTMLDivElement): void {
 
   // Activity Rail 패널 콘텐츠 등록
   registerPanelContent("files", mountFilesPanel);
+  registerPanelContent("pages", mountPagesPanel);
   registerPanelContent("outline", mountOutlinePanel);
 
   // 최초 실행 시 온보딩 모달 표시; ? 버튼으로 재호출 가능

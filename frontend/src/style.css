@@ -360,6 +360,41 @@ body {
 }
 .op-item.op-active .op-level { color: var(--coral); }
 
+/* Pages panel */
+.pp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+.pp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: none;
+  border: 1.5px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.pp-item:hover { background: var(--ink-2); }
+.pp-item.pp-active {
+  border-color: var(--coral);
+  background: var(--ink-2);
+}
+.pp-canvas {
+  max-width: 100%;
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.pp-num {
+  font-size: 10px;
+  color: var(--mute-2);
+  font-family: var(--mono);
+}
+
 .layout {
   display: flex;
   flex: 1;
