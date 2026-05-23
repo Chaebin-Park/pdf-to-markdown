@@ -74,6 +74,10 @@ object Converter {
             outputFolder = outputDir
             isGenerateMarkdown = true
             isGenerateJSON = true
+            // 10-1: 경계선 없는 표(borderless table) 감지를 위해 cluster 방식 사용
+            tableMethod = Config.TABLE_METHOD_CLUSTER
+            // 10-3: Tagged PDF의 구조 트리 활용 — 태그 없는 PDF는 XY-Cut++ 폴백
+            isUseStructTree = true
             when (mode) {
                 ConvertMode.HYBRID -> {
                     hybrid = Config.HYBRID_DOCLING_FAST
@@ -82,7 +86,7 @@ object Converter {
                     hybrid = Config.HYBRID_DOCLING_FAST
                     hybridConfig.mode = HybridConfig.MODE_FULL
                 }
-                ConvertMode.STANDARD -> { /* 기본값 사용 — Java 파서만 실행 */ }
+                else -> { /* Java 파서만 실행 */ }
             }
         }
 }
