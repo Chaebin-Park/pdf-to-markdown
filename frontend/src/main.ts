@@ -20,6 +20,7 @@ import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle } from "./st
 import { mountFilesPanel } from "./files-panel";
 import { mountOutlinePanel } from "./outline-panel";
 import { mountPagesPanel } from "./pages-panel";
+import { mountSearchPanel } from "./search-panel";
 import { registerPanelContent } from "./activity-rail";
 
 /**
@@ -130,6 +131,7 @@ function renderApp(root: HTMLDivElement): void {
   registerPanelContent("files", mountFilesPanel);
   registerPanelContent("pages", mountPagesPanel);
   registerPanelContent("outline", mountOutlinePanel);
+  registerPanelContent("search", mountSearchPanel);
 
   // 최초 실행 시 온보딩 모달 표시; ? 버튼으로 재호출 가능
   setHelpHandler(() => showOnboarding());
