@@ -77,10 +77,11 @@ function renderRecentFiles(): void {
       try {
         const bytes = await readBinaryFile(path);
         const name = path.split(/[\\/]/).pop() ?? path;
-        await openBuffer(bytes.buffer as ArrayBuffer, name);
         currentPdfName = name;
         currentPdfBuffer = bytes.buffer as ArrayBuffer;
-        addRecentFile(name, path);
+        currentPdfPath = path;
+        addRecentFile(name, path, bytes.byteLength);
+        await openBuffer(bytes.buffer as ArrayBuffer, name);
       } catch {
         btn.textContent = `⚠ ${btn.textContent} (파일 없음)`;
         btn.disabled = true;
