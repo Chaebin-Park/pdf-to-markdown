@@ -16,6 +16,7 @@ import { showSettings } from "./settings";
 import { initTheme } from "./theme";
 import { setDoclingReady } from "./docling-state";
 import { checkForUpdates } from "./updater";
+import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle } from "./status-bar";
 
 /**
  * Ktor 서버의 base URL. 서버가 준비되면 설정된다.
@@ -36,6 +37,7 @@ async function init() {
   if (existingPort != null) {
     serverBaseUrl = `http://localhost:${existingPort}`;
     renderApp(root);
+    initStatusBar(existingPort);
     return;
   }
 
@@ -45,6 +47,7 @@ async function init() {
     unlisten();
     unlistenErr();
     renderApp(root);
+    initStatusBar(port);
   });
 
   const unlistenErr = await onServerError((message) => {
@@ -126,11 +129,16 @@ function renderApp(root: HTMLDivElement): void {
   checkForUpdates();
   registerKeyboardShortcuts();
 
+  document.getElementById("pdf-mode-select")?.addEventListener("change", (e) => {
+    setStatusMode((e.target as HTMLSelectElement).value);
+  });
+
   setCancelHandler(() => {
     cancelConversion();
     hideProgress();
     setStreaming(false);
     setConverting(false);
+    setStatusIdle();
   });
 
   setConvertHandler(async () => {
@@ -142,6 +150,9 @@ function renderApp(root: HTMLDivElement): void {
     setStreaming(true);
 
     const mode = getSelectedMode() as Parameters<typeof convertPdf>[1];
+    let conversionStartTime = Date.now();
+    setStatusMode(mode);
+    setStatusIdle();
     await convertPdf(buffer, mode, {
       onProgress: (event) => {
         updateProgress({ percent: event.percent, label: event.label, eta: event.eta });
@@ -151,6 +162,9 @@ function renderApp(root: HTMLDivElement): void {
         setStreaming(false);
         setMarkdown(markdown);
         setConverting(false);
+        const pagesText = document.getElementById("pdf-pagecount")?.textContent ?? "";
+        const totalPages = parseInt(pagesText, 10) || 0;
+        setStatusDone(totalPages, Date.now() - conversionStartTime);
         // bbox JSON이 있으면 파싱 후 토글 버튼 활성화
         if (jsonPath) {
           readTextFile(jsonPath).then((json) => {
@@ -164,6 +178,7 @@ function renderApp(root: HTMLDivElement): void {
         setStreaming(false);
         setMarkdown(`> **오류**: ${message}`);
         setConverting(false);
+        setStatusIdle();
       },
     });
   });

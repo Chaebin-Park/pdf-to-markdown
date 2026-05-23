@@ -50,6 +50,18 @@ export function mountLayout(root: HTMLDivElement): void {
       <div class="divider" id="divider" title="드래그하여 크기 조절"></div>
       <div class="panel panel-right" id="panel-right"></div>
     </div>
+    <div class="app-statusbar" id="app-statusbar">
+      <div class="sb-group">
+        <span class="sb-item" id="sb-mode">● Standard</span>
+      </div>
+      <div class="sb-group">
+        <span class="sb-item" id="sb-progress" style="display:none"></span>
+        <span class="sb-item" id="sb-avgtime"  style="display:none"></span>
+      </div>
+      <div class="sb-group">
+        <span class="sb-item" id="sb-port"></span>
+      </div>
+    </div>
   `;
 
   initWindowControls();

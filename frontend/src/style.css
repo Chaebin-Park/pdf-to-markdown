@@ -1368,6 +1368,43 @@ body {
 }
 
 /* -------------------------------------------------------------------------
+   App Status Bar
+   ---------------------------------------------------------------------- */
+
+.app-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 12px;
+  background: var(--ink-1);
+  border-top: 1px solid var(--line-solid);
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sb-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sb-item {
+  font-size: 11px;
+  color: var(--mute-2);
+  white-space: nowrap;
+}
+
+#sb-mode {
+  color: var(--mute);
+}
+
+#sb-progress {
+  color: var(--coral);
+}
+
+/* -------------------------------------------------------------------------
    라이트 테마 오버라이드  [data-theme="light"]
    ---------------------------------------------------------------------- */
 
