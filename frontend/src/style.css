@@ -136,11 +136,136 @@ body {
    2-panel split layout
    ---------------------------------------------------------------------- */
 
+/* app-body: titlebar 아래 전체 영역 (rail + side-panel + layout) */
+.app-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Activity Rail */
+.activity-rail {
+  width: 56px;
+  flex-shrink: 0;
+  background: var(--ink-1);
+  border-right: 1px solid var(--line-solid);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.rail-top,
+.rail-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.rail-btn {
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--mute);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background 0.12s, color 0.12s;
+}
+
+.rail-btn:hover {
+  background: var(--ink-3);
+  color: var(--fg-2);
+}
+
+.rail-btn.active {
+  color: var(--fg);
+  background: var(--ink-4);
+}
+
+.rail-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 2px;
+  background: var(--coral);
+  border-radius: 0 2px 2px 0;
+}
+
+/* Side Panel */
+.side-panel {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--ink-2);
+  border-right: 1px solid var(--line-solid);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sp-header {
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-solid);
+  flex-shrink: 0;
+}
+
+.sp-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sp-close {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: var(--mute);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.sp-close:hover {
+  background: var(--ink-4);
+  color: var(--fg);
+}
+
+.sp-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sp-empty {
+  padding: 20px 16px;
+  font-size: 12px;
+  color: var(--mute-2);
+  text-align: center;
+}
+
 .layout {
   display: flex;
   flex: 1;
   min-height: 0;
-  width: 100%;
   overflow: hidden;
   position: relative; /* progress-overlay 기준점 */
 }
@@ -1552,6 +1677,34 @@ body {
 [data-theme="light"] .panel-left,
 [data-theme="light"] .panel-right {
   background: #ffffff;
+}
+
+[data-theme="light"] .activity-rail {
+  background: #f0f0f0;
+  border-right-color: #d0d0d0;
+}
+
+[data-theme="light"] .rail-btn {
+  color: #888;
+}
+
+[data-theme="light"] .rail-btn:hover {
+  background: #e4e4e4;
+  color: #444;
+}
+
+[data-theme="light"] .rail-btn.active {
+  background: #e0e0e0;
+  color: #222;
+}
+
+[data-theme="light"] .side-panel {
+  background: #f8f8f8;
+  border-right-color: #d0d0d0;
+}
+
+[data-theme="light"] .sp-header {
+  border-bottom-color: #d0d0d0;
 }
 
 [data-theme="light"] .divider {
