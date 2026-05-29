@@ -26,6 +26,13 @@ fun Application.configureRouting() {
             call.respond(mapOf("status" to "ok"))
         }
 
+        get("/metrics") {
+            val rt = Runtime.getRuntime()
+            val usedMb  = (rt.totalMemory() - rt.freeMemory()) / 1_048_576
+            val maxMb   = rt.maxMemory() / 1_048_576
+            call.respond(mapOf("heapUsed" to usedMb, "heapMax" to maxMb))
+        }
+
         post("/convert") {
             val request = call.receive<ConvertRequest>()
             val jobId = JobManager.createJob()

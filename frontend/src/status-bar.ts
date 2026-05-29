@@ -49,3 +49,39 @@ export function setStatusIdle(): void {
   if (progress) progress.style.display = "none";
   if (avgtime)  avgtime.style.display  = "none";
 }
+
+let jvmPollTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Ktor /metrics 엔드포인트를 주기적으로 조회하여 JVM 힙 사용량을 상태 바에 표시한다. */
+export function startJvmPolling(baseUrl: string, intervalMs = 8000): void {
+  if (jvmPollTimer !== null) return;
+  const update = async () => {
+    try {
+      const res = await fetch(`${baseUrl}/metrics`);
+      if (!res.ok) return;
+      const { heapUsed, heapMax } = await res.json() as { heapUsed: number; heapMax: number };
+      const el = document.getElementById("sb-jvm");
+      if (el) {
+        el.style.display = "inline";
+        el.textContent = `JVM ${heapUsed}/${heapMax}MB`;
+      }
+    } catch {
+      // 서버 미준비 상태는 조용히 무시
+    }
+  };
+  update();
+  jvmPollTimer = setInterval(update, intervalMs);
+}
+
+export function setStatusSafety(count: number): void {
+  const el = document.getElementById("sb-safety");
+  if (!el) return;
+  el.style.display = "inline";
+  if (count > 0) {
+    el.textContent = `⚠ ${count} filtered`;
+    el.className = "sb-item sb-safety-warn";
+  } else {
+    el.textContent = "✓ Safety";
+    el.className = "sb-item sb-safety-ok";
+  }
+}

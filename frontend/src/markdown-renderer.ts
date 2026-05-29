@@ -81,10 +81,6 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
         <button class="md-btn" id="${ID.copyBtn}" title="클립보드에 복사">Copy <kbd>⌘C</kbd></button>
         <button class="md-btn" id="${ID.saveBtn}" title="마크다운 파일로 저장">Save <kbd>⌘S</kbd></button>
       </div>
-      <div class="md-help-bar">
-        <button class="md-settings-btn" id="md-settings-btn" title="설정">⚙</button>
-        <button class="md-help-btn" id="md-help-btn" title="사용 방법 보기">?</button>
-      </div>
       <div class="md-placeholder" id="${ID.placeholder}">
         <p>PDF를 열고 변환하면<br>Markdown이 여기 표시됩니다.</p>
       </div>
@@ -100,16 +96,6 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
   document.getElementById("md-tab-preview")?.addEventListener("click", () => setViewMode("preview"));
   document.getElementById("md-tab-source")?.addEventListener("click", () => setViewMode("source"));
   document.getElementById("md-tab-split")?.addEventListener("click", () => setViewMode("split"));
-}
-
-/** 도움말(?) 버튼 클릭 핸들러를 등록한다. main.ts에서 showOnboarding을 연결한다. */
-export function setHelpHandler(cb: () => void): void {
-  document.getElementById("md-help-btn")?.addEventListener("click", cb);
-}
-
-/** 설정(⚙) 버튼 클릭 핸들러를 등록한다. main.ts에서 showSettings를 연결한다. */
-export function setSettingsHandler(cb: () => void): void {
-  document.getElementById("md-settings-btn")?.addEventListener("click", cb);
 }
 
 /** 현재 로드된 raw Markdown 텍스트를 반환한다. */

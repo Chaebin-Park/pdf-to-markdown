@@ -30,9 +30,13 @@ export function mountOutlinePanel(container: HTMLElement): void {
       const allHeadings = pane.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6");
       const target = allHeadings[i];
       if (!target) return;
-      const paneTop = pane.getBoundingClientRect().top;
+      // preview 모드: .md-content가 스크롤 컨테이너, split 모드: .md-preview-pane
+      const content = document.getElementById("md-content");
+      const scrollEl = content?.classList.contains("mode-split") ? pane : content;
+      if (!scrollEl) return;
+      const scrollTop = scrollEl.getBoundingClientRect().top;
       const targetTop = target.getBoundingClientRect().top;
-      pane.scrollTop += targetTop - paneTop - 16;
+      scrollEl.scrollTop += targetTop - scrollTop - 16;
     });
   });
 
@@ -52,6 +56,10 @@ function initActiveHighlight(container: HTMLElement): void {
     buttons.forEach((btn, i) => btn.classList.toggle("op-active", i === idx));
   };
 
+  // preview 모드: md-content가 스크롤 컨테이너, split 모드: md-preview-pane (BUG-v08-01과 동일 패턴)
+  const content = document.getElementById("md-content");
+  const scrollRoot = content?.classList.contains("mode-split") ? pane : content;
+
   observer = new IntersectionObserver(
     (entries) => {
       const visible = entries
@@ -62,7 +70,7 @@ function initActiveHighlight(container: HTMLElement): void {
         if (idx !== -1) setActive(idx);
       }
     },
-    { root: pane, threshold: 0, rootMargin: "0px 0px -80% 0px" },
+    { root: scrollRoot, threshold: 0, rootMargin: "0px 0px -80% 0px" },
   );
 
   allHeadings.forEach((el) => observer!.observe(el));

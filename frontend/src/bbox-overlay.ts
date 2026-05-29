@@ -24,13 +24,20 @@ interface RawElement {
   "page number"?: number;
   "bounding box"?: [number, number, number, number];
   content?: string;
+  "hidden text"?: boolean;
   kids?: RawElement[];
   rows?: RawElement[];
   cells?: RawElement[];
   "list items"?: RawElement[];
 }
 
-interface BBoxItem {
+export interface SafetyItem {
+  type: string;
+  pageNumber: number;
+  content: string;
+}
+
+export interface BBoxItem {
   type: string;
   pageNumber: number;
   bbox: [number, number, number, number]; // [leftX, bottomY, rightX, topY]
@@ -61,6 +68,7 @@ const DEFAULT_FILL = "rgba(200,200,200,0.1)";
 // ---------------------------------------------------------------------------
 
 let items: BBoxItem[] = [];
+let hiddenItems: SafetyItem[] = [];
 let visible = false;
 let orderVisible = false;
 
@@ -110,6 +118,7 @@ const TOP_LEVEL_TYPES = new Set(["paragraph", "heading", "table", "list", "image
  */
 export function parseBBoxJson(json: string): void {
   items = [];
+  hiddenItems = [];
   try {
     const doc = JSON.parse(json);
     extractItems(doc.kids ?? []);
@@ -117,6 +126,16 @@ export function parseBBoxJson(json: string): void {
     console.warn("bbox JSON 파싱 실패:", e);
   }
   if (visible) renderOverlays();
+}
+
+/** safety 필터로 감지된 숨겨진 텍스트 항목 목록을 반환한다. */
+export function getHiddenItems(): SafetyItem[] {
+  return hiddenItems;
+}
+
+/** 파싱된 전체 bbox 항목 목록을 반환한다. */
+export function getBBoxItems(): BBoxItem[] {
+  return items;
 }
 
 /** 오버레이를 표시한다. */
@@ -255,6 +274,13 @@ function extractItems(elements: RawElement[]): void {
         bbox: el["bounding box"]!,
         content: el.content ?? el.type ?? "",
         meta: buildMeta(el),
+      });
+    }
+    if (el["hidden text"] === true) {
+      hiddenItems.push({
+        type: el.type ?? "unknown",
+        pageNumber: el["page number"] ?? 1,
+        content: el.content ?? "",
       });
     }
     if (el.kids) extractItems(el.kids);

@@ -460,6 +460,83 @@ body {
   font-weight: 600;
 }
 
+/* Safety panel */
+.safety-panel { display: flex; flex-direction: column; }
+.safety-status {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.safety-ok-state   { color: #4ade80; }
+.safety-warn-state { color: #fbbf24; }
+.safety-status-icon { font-size: 13px; }
+.safety-section {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.safety-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mute-2);
+  margin: 0 0 6px;
+}
+.safety-filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+}
+.safety-badge-on {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4ade80;
+  border: 1px solid #4ade80;
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.safety-filter-info { display: flex; flex-direction: column; gap: 1px; }
+.safety-filter-name { font-size: 11px; color: var(--fg); }
+.safety-filter-desc { font-size: 10px; color: var(--mute-2); }
+.safety-item-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.safety-item-row:last-child { border-bottom: none; }
+.safety-item-header { display: flex; align-items: center; justify-content: space-between; }
+.safety-item-type {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fbbf24;
+  font-family: var(--mono);
+}
+.safety-item-page {
+  font-size: 10px;
+  color: var(--mute-2);
+  font-family: var(--mono);
+}
+.safety-item-content {
+  font-size: 10px;
+  color: var(--mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#sb-safety-ok   { color: #4ade80; }
+#sb-safety-warn { color: #fbbf24; }
+.sb-safety-ok   { color: #4ade80 !important; }
+.sb-safety-warn { color: #fbbf24 !important; }
+
 .layout {
   display: flex;
   flex: 1;
@@ -1688,6 +1765,56 @@ body {
    App Titlebar (custom window chrome — decorations: false)
    ---------------------------------------------------------------------- */
 
+/* 기능 툴바 (네이티브 타이틀바 아래) */
+.app-toolbar {
+  height: 36px;
+  padding: 0 12px;
+  background: var(--ink-3);
+  border-bottom: 1px solid var(--line-solid);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.atb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.atb-filename {
+  font-size: 13px;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+.atb-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--mute-2);
+  white-space: nowrap;
+}
+.atb-tagged { color: var(--coral-soft); }
+.atb-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .app-toolbar {
+  background: #f0ede8;
+  border-bottom-color: #d0c8c0;
+}
+[data-theme="light"] .atb-filename { color: #333; }
+[data-theme="light"] .atb-meta     { color: #777; }
+
 .app-titlebar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -1699,11 +1826,24 @@ body {
   flex-shrink: 0;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* 타이틀바 내 인터랙티브 요소는 드래그 영역 제외 */
+.app-titlebar button,
+.app-titlebar select,
+.app-titlebar input,
+.app-titlebar kbd {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .titlebar-left {
   display: flex;
   align-items: center;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .titlebar-traffic {
@@ -1737,6 +1877,8 @@ body {
   justify-content: center;
   gap: 7px;
   min-width: 0;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .titlebar-logo {
@@ -1790,6 +1932,8 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .tb-action {
@@ -1862,10 +2006,23 @@ body {
    라이트 테마 오버라이드  [data-theme="light"]
    ---------------------------------------------------------------------- */
 
+/* 라이트 모드에서 CSS 변수를 전면 재정의 — 모든 var() 참조가 자동 반전됨 */
+[data-theme="light"] {
+  --fg:        #1c1a17;
+  --fg-2:      #3a3530;
+  --mute:      #5a5048;
+  --mute-2:    #8a7f74;
+  --line:      rgba(0,0,0,0.08);
+  --line-solid: #d0c8c0;
+  --ink-2:     #f5f3ef;
+  --ink-3:     #eeebe6;
+  --ink-4:     #e6e2dc;
+}
+
 [data-theme="light"] body,
 [data-theme="light"] #app {
   background: #f0f0f0;
-  color: var(--ink-2);
+  color: #1c1a17;
 }
 
 [data-theme="light"] .layout {
@@ -1910,10 +2067,9 @@ body {
 }
 
 [data-theme="light"] .pdf-toolbar,
-[data-theme="light"] .md-toolbar,
-[data-theme="light"] .md-help-bar {
-  background: var(--fg);
-  border-bottom: 1px solid #d0d0d0;
+[data-theme="light"] .md-toolbar {
+  background: #f0ede8;
+  border-bottom: 1px solid #d0c8c0;
 }
 
 [data-theme="light"] .mdt-tabs {
@@ -1952,7 +2108,7 @@ body {
 [data-theme="light"] .pdf-mode-select,
 [data-theme="light"] .pdf-page-input {
   background: #fff;
-  color: var(--ink-2);
+  color: #1c1a17;
   border-color: #c0c0c0;
 }
 
@@ -2006,7 +2162,7 @@ body {
 }
 
 [data-theme="light"] .md-content {
-  color: var(--ink-2);
+  color: #1c1a17;
   background: #ffffff;
 }
 
@@ -2014,7 +2170,7 @@ body {
 [data-theme="light"] .md-content h2,
 [data-theme="light"] .md-content h3,
 [data-theme="light"] .md-content h4 {
-  color: var(--ink-2);
+  color: #1c1a17;
 }
 
 [data-theme="light"] .md-content h1,
@@ -2034,7 +2190,7 @@ body {
 
 [data-theme="light"] .md-content th {
   background: #f0f0f0;
-  color: var(--ink-2);
+  color: #1c1a17;
 }
 
 [data-theme="light"] .md-content th,
@@ -2067,31 +2223,25 @@ body {
 [data-theme="light"] .settings-card,
 [data-theme="light"] .onboarding-card {
   background: #ffffff;
-  color: var(--ink-2);
+  color: #1c1a17;
+  border-color: #d0c8c0;
 }
-
-[data-theme="light"] .settings-section {
-  border-top-color: #e0e0e0;
-}
-
-[data-theme="light"] .settings-section-title,
-[data-theme="light"] .settings-title {
-  color: var(--ink-2);
-}
-
-[data-theme="light"] .settings-section-desc {
-  color: #555;
-}
-
-[data-theme="light"] .settings-theme-btn {
-  background: var(--fg);
-  color: #333;
-  border-color: #c0c0c0;
-}
-
-[data-theme="light"] .settings-theme-btn:hover {
-  background: #d8d8d8;
-}
+[data-theme="light"] .settings-header   { border-bottom-color: #e0dbd4; }
+[data-theme="light"] .settings-title    { color: #1c1a17; }
+[data-theme="light"] .settings-close-btn { color: #888; }
+[data-theme="light"] .settings-close-btn:hover { background: #e8e4de; color: #333; }
+[data-theme="light"] .settings-section-title { color: #333; }
+[data-theme="light"] .settings-section-desc  { color: #666; }
+[data-theme="light"] .settings-section + .settings-section { border-top-color: #e0dbd4; }
+[data-theme="light"] .badge-on  { background: #d4f0e0; color: #1a6640; border-color: #90d4b0; }
+[data-theme="light"] .badge-off { background: #fde8e8; color: #c0392b; border-color: #f0a0a0; }
+[data-theme="light"] .settings-log-box  { background: #f5f5f5; border-color: #ddd; }
+[data-theme="light"] .settings-log-line { color: #555; }
+[data-theme="light"] .settings-theme-btn { background: #e8e5e0; color: #444; border-color: #ccc; }
+[data-theme="light"] .settings-theme-btn:hover { background: #dedad4; color: #222; }
+[data-theme="light"] .settings-theme-btn.active { background: #1c1a17; color: #fff; border-color: #1c1a17; }
+[data-theme="light"] .settings-progress-bar-track { background: #e0dbd4; }
+[data-theme="light"] .settings-installed-text { color: #1a6640; }
 
 [data-theme="light"] .pdf-preview-limit-banner {
   background: #fff8e1;
@@ -2110,3 +2260,41 @@ body {
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background: #a0a0a0;
 }
+
+/* 사이드 패널 내부 텍스트 (sp-title, sp-close, 각 패널 콘텐츠) */
+[data-theme="light"] .sp-title,
+[data-theme="light"] .sp-close   { color: #444; }
+[data-theme="light"] .sp-empty   { color: #888; }
+
+/* Files / Outline / Pages / Search / Safety 패널 공통 텍스트 */
+[data-theme="light"] .fp-section,
+[data-theme="light"] .fp-label,
+[data-theme="light"] .fp-item-name   { color: #333; }
+[data-theme="light"] .fp-item-meta   { color: #777; }
+[data-theme="light"] .op-item        { color: #333; }
+[data-theme="light"] .op-item:hover  { background: #ebebeb; }
+[data-theme="light"] .pp-item-label  { color: #555; }
+[data-theme="light"] .srp-count      { color: #777; }
+[data-theme="light"] .srp-item       { color: #333; border-bottom-color: #e0e0e0; }
+[data-theme="light"] .srp-item:hover { background: #efefef; }
+[data-theme="light"] .srp-page       { color: #c0392b; }
+[data-theme="light"] .srp-input      { background: #fff; color: #333; border-color: #ccc; }
+
+/* Safety 패널 */
+[data-theme="light"] .safety-section-label { color: #888; }
+[data-theme="light"] .safety-filter-name   { color: #333; }
+[data-theme="light"] .safety-filter-desc   { color: #777; }
+[data-theme="light"] .safety-item-content  { color: #666; }
+[data-theme="light"] .safety-item-row      { border-bottom-color: #e0e0e0; }
+
+/* 상태 바 */
+[data-theme="light"] .app-statusbar { background: #e8e5e0; border-top-color: #d0c8c0; }
+[data-theme="light"] .sb-item       { color: #666; }
+[data-theme="light"] #sb-mode       { color: #444; }
+
+/* 라이트 모드 툴바 내부 텍스트 색상 */
+[data-theme="light"] .pdf-filename,
+[data-theme="light"] .titlebar-center span { color: #333; }
+[data-theme="light"] .ptb-zoom-label       { color: #444; }
+[data-theme="light"] .md-settings-btn,
+[data-theme="light"] .md-help-btn          { color: #555; }

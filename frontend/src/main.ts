@@ -7,20 +7,21 @@ import {
 } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
 import { mountPdfViewer, setConvertHandler, setCancelHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
-import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown, setHelpHandler, setSettingsHandler } from "./markdown-renderer";
+import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
 import { convertPdf, cancelConversion } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
-import { parseBBoxJson, toggleBBoxOverlay } from "./bbox-overlay";
+import { parseBBoxJson, toggleBBoxOverlay, getHiddenItems } from "./bbox-overlay";
 import { maybeShowOnboarding, showOnboarding } from "./onboarding";
 import { showSettings } from "./settings";
 import { initTheme } from "./theme";
 import { setDoclingReady } from "./docling-state";
 import { checkForUpdates } from "./updater";
-import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle } from "./status-bar";
+import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle, setStatusSafety, startJvmPolling } from "./status-bar";
 import { mountFilesPanel } from "./files-panel";
 import { mountOutlinePanel } from "./outline-panel";
 import { mountPagesPanel } from "./pages-panel";
 import { mountSearchPanel } from "./search-panel";
+import { mountSafetyPanel, updateSafetyPanel } from "./safety-panel";
 import { registerPanelContent } from "./activity-rail";
 
 /**
@@ -43,6 +44,7 @@ async function init() {
     serverBaseUrl = `http://localhost:${existingPort}`;
     renderApp(root);
     initStatusBar(existingPort);
+    startJvmPolling(serverBaseUrl);
     return;
   }
 
@@ -53,6 +55,7 @@ async function init() {
     unlistenErr();
     renderApp(root);
     initStatusBar(port);
+    startJvmPolling(serverBaseUrl!);
   });
 
   const unlistenErr = await onServerError((message) => {
@@ -132,10 +135,13 @@ function renderApp(root: HTMLDivElement): void {
   registerPanelContent("pages", mountPagesPanel);
   registerPanelContent("outline", mountOutlinePanel);
   registerPanelContent("search", mountSearchPanel);
+  registerPanelContent("safety", mountSafetyPanel);
 
-  // 최초 실행 시 온보딩 모달 표시; ? 버튼으로 재호출 가능
-  setHelpHandler(() => showOnboarding());
-  setSettingsHandler(() => showSettings());
+  // Rail 하단 버튼 핸들러 직접 등록 (md-help-btn/md-settings-btn 제거 후 대체)
+  document.getElementById("rail-help")?.addEventListener("click", () => showOnboarding());
+  document.getElementById("rail-settings")?.addEventListener("click", () => showSettings());
+
+  // 최초 실행 시 온보딩 모달 표시
   maybeShowOnboarding();
   checkForUpdates();
   registerKeyboardShortcuts();
@@ -176,11 +182,14 @@ function renderApp(root: HTMLDivElement): void {
         const pagesText = document.getElementById("pdf-pagecount")?.textContent ?? "";
         const totalPages = parseInt(pagesText, 10) || 0;
         setStatusDone(totalPages, Date.now() - conversionStartTime);
-        // bbox JSON이 있으면 파싱 후 토글 버튼 활성화
+        // bbox JSON이 있으면 파싱 후 토글 버튼 활성화 + safety 패널 갱신
         if (jsonPath) {
           readTextFile(jsonPath).then((json) => {
             parseBBoxJson(json);
             setBBoxAvailable(true, () => toggleBBoxOverlay());
+            const hiddenCount = getHiddenItems().length;
+            setStatusSafety(hiddenCount);
+            updateSafetyPanel();
           }).catch(() => { /* JSON 없어도 계속 */ });
         }
       },
