@@ -10,6 +10,7 @@
 
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { refreshBBoxOverlay, clearBBox, toggleOrderOverlay } from "./bbox-overlay";
 import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
 import { openPdfFile } from "./tauri-bridge";
@@ -22,6 +23,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 const RECENT_KEY = "recentPdfs";
 const RECENT_MAX = 5;
+export const RECENT_CHANGED_EVENT = "recent-pdfs-changed";
 
 interface RecentFile { name: string; path: string; pages?: number; size?: number; }
 
@@ -31,15 +33,24 @@ export function getRecentFiles(): RecentFile[] {
   } catch { return []; }
 }
 
-/** 경로로 PDF를 직접 열고 최근 파일 목록을 갱신한다. */
-export async function openPdfFromPath(path: string): Promise<void> {
+/**
+ * 경로로 PDF를 직접 연다.
+ * 새로 추가된 파일만 Recent 맨 앞으로 이동하고, 목록에서 재열 때는 순서를 유지한다.
+ */
+export async function openPdfFromPath(path: string, promoteRecent = true): Promise<void> {
+  const requestVersion = ++openRequestVersion;
   const { readBinaryFile } = await import("./tauri-bridge");
   const bytes = await readBinaryFile(path);
+  if (openRequestVersion !== requestVersion) return;
   const name = path.split(/[\\/]/).pop() ?? path;
   currentPdfBuffer = bytes.buffer as ArrayBuffer;
   currentPdfName = name;
   currentPdfPath = path;
-  addRecentFile(name, path, bytes.byteLength);
+  if (promoteRecent) {
+    addRecentFile(name, path, bytes.byteLength);
+  } else {
+    notifyRecentFilesChanged();
+  }
   await openBuffer(bytes.buffer as ArrayBuffer, name);
 }
 
@@ -47,7 +58,7 @@ function addRecentFile(name: string, path: string, size?: number): void {
   const list = getRecentFiles().filter((r) => r.path !== path);
   list.unshift({ name, path, size });
   localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
-  renderRecentFiles();
+  notifyRecentFilesChanged();
 }
 
 function updateRecentFileMeta(path: string, pages: number): void {
@@ -56,7 +67,14 @@ function updateRecentFileMeta(path: string, pages: number): void {
   if (entry) {
     entry.pages = pages;
     localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    notifyRecentFilesChanged();
   }
+}
+
+/** Recent 저장소 변경을 각 패널에 알리고 드롭존 목록을 즉시 갱신한다. */
+function notifyRecentFilesChanged(): void {
+  renderRecentFiles();
+  window.dispatchEvent(new CustomEvent(RECENT_CHANGED_EVENT));
 }
 
 function renderRecentFiles(): void {
@@ -67,21 +85,14 @@ function renderRecentFiles(): void {
   el.style.display = "block";
   el.innerHTML = `<p class="pdf-recent-label">최근 파일</p>` +
     list.map((r) =>
-      `<button class="pdf-recent-item" data-path="${encodeURIComponent(r.path)}" title="${r.path}">${r.name}</button>`
+      `<button class="pdf-recent-item${r.path === currentPdfPath ? " active" : ""}" data-path="${encodeURIComponent(r.path)}" title="${r.path}">${r.name}</button>`
     ).join("");
   el.querySelectorAll<HTMLButtonElement>(".pdf-recent-item").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const path = decodeURIComponent(btn.dataset.path ?? "");
       if (!path) return;
-      const { readBinaryFile } = await import("./tauri-bridge");
       try {
-        const bytes = await readBinaryFile(path);
-        const name = path.split(/[\\/]/).pop() ?? path;
-        currentPdfName = name;
-        currentPdfBuffer = bytes.buffer as ArrayBuffer;
-        currentPdfPath = path;
-        addRecentFile(name, path, bytes.byteLength);
-        await openBuffer(bytes.buffer as ArrayBuffer, name);
+        await openPdfFromPath(path, false);
       } catch {
         btn.textContent = `⚠ ${btn.textContent} (파일 없음)`;
         btn.disabled = true;
@@ -106,9 +117,13 @@ export let currentPdfBuffer: ArrayBuffer | null = null;
 
 let pdfDoc: PDFDocumentProxy | null = null;
 let currentPdfPath: string | null = null;
+let openRequestVersion = 0;
 
 /** 현재 로드된 PDFDocumentProxy. Pages 패널 썸네일 렌더링에 사용. */
 export function getPdfDoc(): PDFDocumentProxy | null { return pdfDoc; }
+
+/** Recent 목록에서 현재 열린 PDF를 표시하기 위한 절대 경로를 반환한다. */
+export function getCurrentPdfPath(): string | null { return currentPdfPath; }
 let resizeObserver: ResizeObserver | null = null;
 let renderVersion = 0; // 재렌더링 시 이전 작업 취소용
 let convertHandler: (() => void) | null = null;
@@ -186,6 +201,7 @@ export function mountPdfViewer(container: HTMLElement): void {
     </div>
   `;
 
+  registerNativeDragAndDrop(container);
   registerDragAndDrop(container);
   registerFileInput(container);
   registerModeWarning();
@@ -261,8 +277,13 @@ export function setConverting(active: boolean): void {
 
 /** File 객체로 PDF를 로드한다. */
 export async function loadPdf(file: File): Promise<void> {
+  const requestVersion = ++openRequestVersion;
+  const buffer = await file.arrayBuffer();
+  if (openRequestVersion !== requestVersion) return;
   currentPdfName = file.name;
-  currentPdfBuffer = await file.arrayBuffer();
+  currentPdfBuffer = buffer;
+  currentPdfPath = null;
+  notifyRecentFilesChanged();
   await openBuffer(currentPdfBuffer, file.name);
 }
 
@@ -303,9 +324,12 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
   </div>`;
 
   const loadingTask = pdfjsLib.getDocument({ data: buffer.slice(0) });
-  pdfDoc = await loadingTask.promise;
-
-  if (renderVersion !== version) return; // 취소됨
+  const nextPdfDoc = await loadingTask.promise;
+  if (renderVersion !== version) {
+    await nextPdfDoc.destroy();
+    return;
+  }
+  pdfDoc = nextPdfDoc;
 
   filenameEl.textContent = name;
   const totalPages = pdfDoc.numPages;
@@ -359,6 +383,7 @@ async function renderAllPages(doc: PDFDocumentProxy, version: number, limit: num
   for (let i = 1; i <= limit; i++) {
     if (renderVersion !== version) return;
     const page = await doc.getPage(i);
+    if (renderVersion !== version) return;
     const canvas = buildCanvas(page, pages.clientWidth);
     const wrapper = document.createElement("div");
     wrapper.className = "pdf-page-wrapper";
@@ -384,6 +409,7 @@ async function rerenderAll(doc: PDFDocumentProxy, version: number): Promise<void
     if (renderVersion !== version) return;
     const pageNum = Number(wrapper.dataset.page);
     const page = await doc.getPage(pageNum);
+    if (renderVersion !== version) return;
     const existing = wrapper.querySelector("canvas");
     if (!existing) continue;
     const newCanvas = buildCanvas(page, pages.clientWidth);
@@ -482,6 +508,33 @@ function setupPageNav(
 // Event registration
 // ---------------------------------------------------------------------------
 
+/**
+ * Tauri 네이티브 드롭 이벤트에서 절대 경로를 받아 PDF를 연다.
+ * HTML File API와 달리 경로가 유지되므로 최근 파일 목록에서도 다시 열 수 있다.
+ */
+function registerNativeDragAndDrop(container: HTMLElement): void {
+  void getCurrentWebview().onDragDropEvent((event) => {
+    const dropzone = container.querySelector(".pdf-dropzone");
+    if (event.payload.type === "enter" || event.payload.type === "over") {
+      dropzone?.classList.add("drag-over");
+      return;
+    }
+    if (event.payload.type === "leave") {
+      dropzone?.classList.remove("drag-over");
+      return;
+    }
+
+    dropzone?.classList.remove("drag-over");
+    const path = event.payload.paths.find((candidate) =>
+      candidate.toLowerCase().endsWith(".pdf"),
+    );
+    if (path) void openPdfFromPath(path);
+  }).catch((error) => {
+    console.warn("Tauri 네이티브 드롭 이벤트 등록 실패:", error);
+  });
+}
+
+/** 브라우저 환경에서 동작하는 HTML5 드래그 앤 드롭 폴백을 등록한다. */
 function registerDragAndDrop(container: HTMLElement): void {
   container.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -506,6 +559,7 @@ function registerOpenDialog(): void {
   document.getElementById("pdf-open-dialog-btn")?.addEventListener("click", async () => {
     const result = await openPdfFile();
     if (!result) return;
+    ++openRequestVersion;
     currentPdfName = result.name;
     currentPdfBuffer = result.buffer;
     currentPdfPath = result.path;
