@@ -101,18 +101,32 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 ///
 /// Windows GUI 앱은 사용자 셸과 다른 환경을 상속받아 PATH에서 java를 못 찾는 경우가 있으므로
 /// JAVA_HOME 및 공통 설치 경로를 먼저 확인한다.
-/// jre.zip 번들을 리소스 디렉토리에 압축 해제한다 (Windows 전용).
+/// jre.zip 번들을 사용자 캐시 디렉터리에 압축 해제한다 (Windows 전용).
 ///
 /// 이미 추출되어 있으면 즉시 경로를 반환한다.
-/// 첫 실행 시 PowerShell의 `Expand-Archive`로 jre.zip을 해제한다.
+/// 첫 실행 시 PowerShell의 `Expand-Archive`로 `%LOCALAPPDATA%` 아래에 jre.zip을 해제한다.
+/// 앱 설치 디렉터리는 쓰기 권한이 없을 수 있으므로 읽기 전용 리소스 보관에만 사용한다.
 #[cfg(target_os = "windows")]
 fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
-    let resource_dir = app.path().resource_dir().ok()?;
-    let java_exe = resource_dir.join("jre").join("bin").join("java.exe");
+    let runtime_dir = app
+        .path()
+        .cache_dir()
+        .ok()?
+        .join("opendataloader")
+        .join("runtime");
+    let java_exe = runtime_dir.join("jre").join("bin").join("java.exe");
 
     if java_exe.exists() {
         log::info!("번들 JRE 이미 추출됨: {}", java_exe.display());
         return Some(java_exe);
+    }
+
+    if let Err(error) = std::fs::create_dir_all(&runtime_dir) {
+        log::error!(
+            "번들 JRE 캐시 디렉터리 생성 실패: {} ({error})",
+            runtime_dir.display()
+        );
+        return None;
     }
 
     let zip_path = app.path()
@@ -124,7 +138,7 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
         return None;
     }
 
-    log::info!("번들 JRE 압축 해제 중: {} → {}", zip_path.display(), resource_dir.display());
+    log::info!("번들 JRE 압축 해제 중: {} → {}", zip_path.display(), runtime_dir.display());
 
     let status = Command::new("powershell")
         .args([
@@ -132,7 +146,7 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
             &format!(
                 "Expand-Archive -Force '{}' '{}'",
                 zip_path.display(),
-                resource_dir.display()
+                runtime_dir.display()
             ),
         ])
         .status()
