@@ -7,6 +7,22 @@ use std::{sync::mpsc, thread};
 
 use tauri::{Emitter, Manager};
 
+/// Windows GUI 앱에서 자식 프로세스의 콘솔 창 생성을 막는다.
+///
+/// PowerShell과 JVM은 기본적으로 별도 콘솔 창을 표시할 수 있다.
+/// release 앱의 부트스트랩 과정이 사용자에게 터미널 창으로 노출되지 않도록 한다.
+#[cfg(target_os = "windows")]
+fn hide_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+/// Windows가 아닌 플랫폼에서는 자식 프로세스 생성 플래그를 변경하지 않는다.
+#[cfg(not(target_os = "windows"))]
+fn hide_console_window(_command: &mut Command) {}
+
 /// Ktor 로컬 서버의 포트 상태.
 ///
 /// 앱 전체에서 공유되며 [tauri::Builder::manage]로 등록된다.
@@ -140,7 +156,9 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 
     log::info!("번들 JRE 압축 해제 중: {} → {}", zip_path.display(), runtime_dir.display());
 
-    let status = Command::new("powershell")
+    let mut powershell = Command::new("powershell");
+    hide_console_window(&mut powershell);
+    let status = powershell
         .args([
             "-NoProfile", "-NonInteractive", "-Command",
             &format!(
@@ -598,7 +616,9 @@ pub fn run() {
             log::info!("[진단] 선택된 java: {java_display}");
             log::info!("[진단] 로그 디렉토리: {log_dir}");
             log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
-            let child = Command::new(&java)
+            let mut java_command = Command::new(&java);
+            hide_console_window(&mut java_command);
+            let child = java_command
                 .arg("-jar")
                 .arg(&jar_path)
                 .stdout(Stdio::piped())
