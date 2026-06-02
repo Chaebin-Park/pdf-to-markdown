@@ -14,6 +14,8 @@ import {
   onInstallLog,
   startDoclingServe,
   onDoclingReady,
+  getLogDir,
+  openLogDir,
   type InstallProgress,
 } from "./tauri-bridge";
 import { setDoclingReady } from "./docling-state";
@@ -27,15 +29,18 @@ import { getTheme, setTheme, type ThemeMode } from "./theme";
 export async function showSettings(): Promise<void> {
   if (document.getElementById("settings-modal")) return;
 
-  const installed = await checkHybridInstalled();
-  renderModal(installed);
+  const [installed, logDir] = await Promise.all([
+    checkHybridInstalled(),
+    getLogDir(),
+  ]);
+  renderModal(installed, logDir);
 }
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
-function renderModal(installed: boolean): void {
+function renderModal(installed: boolean, logDir: string): void {
   const modal = document.createElement("div");
   modal.id = "settings-modal";
   modal.className = "settings-backdrop";
@@ -85,12 +90,26 @@ function renderModal(installed: boolean): void {
             </button>`).join("")}
         </div>
       </section>
+
+      <section class="settings-section">
+        <div class="settings-section-header">
+          <span class="settings-section-title">진단 로그</span>
+        </div>
+        <p class="settings-section-desc">
+          앱 시작 및 PDF 변환 실패 원인을 확인할 때 사용합니다.
+        </p>
+        <code class="settings-log-path">${escapeHtml(logDir)}</code>
+        <button class="settings-secondary-btn" id="settings-open-log-dir-btn">로그 폴더 열기</button>
+      </section>
     </div>
   `;
 
   document.body.appendChild(modal);
 
   document.getElementById("settings-close-btn")?.addEventListener("click", closeModal);
+  document.getElementById("settings-open-log-dir-btn")?.addEventListener("click", () => {
+    void openLogDir().catch((error) => alert(`로그 폴더 열기 실패: ${error}`));
+  });
   modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
   const onKey = (e: KeyboardEvent) => {
@@ -113,6 +132,16 @@ function renderModal(installed: boolean): void {
       btn.classList.add("active");
     });
   });
+}
+
+/** HTML 템플릿에 삽입할 문자열의 특수문자를 이스케이프한다. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function renderInstallButton(): string {

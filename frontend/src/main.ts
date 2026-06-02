@@ -201,15 +201,40 @@ function renderApp(root: HTMLDivElement): void {
           }).catch(() => { /* JSON 없어도 계속 */ });
         }
       },
-      onError: (message) => {
+      onError: (message, detail) => {
         hideProgress();
         setStreaming(false);
-        setMarkdown(`> **오류**: ${message}`);
+        setMarkdown(formatConversionError(message, detail));
         setConverting(false);
         setStatusIdle();
       },
     });
   });
+}
+
+/**
+ * 변환 오류를 Markdown 패널에 표시할 진단 블록으로 변환한다.
+ *
+ * 상세 정보는 접힌 영역에 넣어 일반 사용 흐름을 방해하지 않는다.
+ * 전체 스택 트레이스는 설정의 로그 폴더에서 확인할 수 있다.
+ */
+function formatConversionError(message: string, detail?: string | null): string {
+  if (!detail) return `> **오류**: ${message}`;
+  const safeDetail = detail.replace(/```/g, "'''");
+  return [
+    `> **오류**: ${message}`,
+    "",
+    "<details>",
+    "<summary>오류 상세 보기</summary>",
+    "",
+    "```text",
+    safeDetail,
+    "```",
+    "",
+    "</details>",
+    "",
+    "> 전체 스택 트레이스는 설정의 **진단 로그** 폴더에서 확인할 수 있습니다.",
+  ].join("\n");
 }
 
 function registerKeyboardShortcuts(): void {

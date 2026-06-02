@@ -126,6 +126,16 @@ export async function readBinaryFile(path: string): Promise<Uint8Array> {
   return new Uint8Array(bytes);
 }
 
+/** Rust 부트스트랩 로그와 Ktor server.log가 저장되는 디렉터리를 반환한다. */
+export function getLogDir(): Promise<string> {
+  return invoke<string>("get_log_dir");
+}
+
+/** OS 기본 파일 탐색기로 앱 진단 로그 디렉터리를 연다. */
+export function openLogDir(): Promise<void> {
+  return invoke<void>("open_log_dir");
+}
+
 /**
  * PDF 파일 열기 다이얼로그를 표시하고 선택한 파일을 읽어 반환한다.
  * 취소 시 null을 반환한다.

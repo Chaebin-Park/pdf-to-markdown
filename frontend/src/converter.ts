@@ -38,6 +38,7 @@ interface JobResult {
   markdownPath: string | null;
   jsonPath: string | null;
   error: string | null;
+  errorDetail: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +51,7 @@ export interface ConversionCallbacks {
   /** 변환 완료 — Markdown 문자열 전달 */
   onComplete: (markdown: string, jsonPath: string | null) => void;
   /** 오류 발생 */
-  onError: (message: string) => void;
+  onError: (message: string, detail?: string | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +140,10 @@ export async function convertPdf(
   }
 
   if (result.status === "ERROR" || !result.markdownPath) {
-    callbacks.onError(result.error ?? "알 수 없는 변환 오류가 발생했습니다.");
+    callbacks.onError(
+      result.error ?? "알 수 없는 변환 오류가 발생했습니다.",
+      result.errorDetail,
+    );
     return;
   }
 

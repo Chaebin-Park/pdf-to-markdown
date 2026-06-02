@@ -549,6 +549,44 @@ fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|e| format!("파일 읽기 실패 ({path}): {e}"))
 }
 
+/// 앱 진단 로그 디렉터리의 절대 경로를 반환한다.
+///
+/// Rust 부트스트랩 로그와 Ktor `server.log`가 같은 디렉터리에 저장된다.
+#[tauri::command]
+fn get_log_dir(app: tauri::AppHandle) -> Result<String, String> {
+    app.path()
+        .app_log_dir()
+        .map_err(|e| format!("로그 디렉터리 조회 실패: {e}"))?
+        .to_str()
+        .map(|path| path.to_string())
+        .ok_or_else(|| "로그 디렉터리 경로 변환 실패".to_string())
+}
+
+/// OS 기본 파일 탐색기로 앱 진단 로그 디렉터리를 연다.
+#[tauri::command]
+fn open_log_dir(app: tauri::AppHandle) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("로그 디렉터리 조회 실패: {e}"))?;
+    std::fs::create_dir_all(&path)
+        .map_err(|e| format!("로그 디렉터리 생성 실패 ({}): {e}", path.display()))?;
+
+    #[cfg(target_os = "macos")]
+    let mut command = Command::new("open");
+    #[cfg(target_os = "windows")]
+    let mut command = Command::new("explorer");
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let mut command = Command::new("xdg-open");
+
+    hide_console_window(&mut command);
+    command
+        .arg(&path)
+        .spawn()
+        .map_err(|e| format!("로그 디렉터리 열기 실패 ({}): {e}", path.display()))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 프로세스 핸들은 setup 클로저와 run 클로저 양쪽에서 접근하므로 Arc로 공유
@@ -714,7 +752,9 @@ pub fn run() {
             get_docling_port,
             save_temp_pdf,
             read_text_file,
-            read_binary_file
+            read_binary_file,
+            get_log_dir,
+            open_log_dir
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

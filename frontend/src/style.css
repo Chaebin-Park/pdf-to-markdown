@@ -1644,6 +1644,34 @@ body {
   color: var(--coral);
 }
 
+.settings-log-path {
+  display: block;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line-solid);
+  border-radius: 4px;
+  color: var(--mute-2);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.settings-secondary-btn {
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid var(--line-solid);
+  border-radius: 5px;
+  color: var(--fg-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.settings-secondary-btn:hover {
+  background: var(--line-solid);
+  border-color: var(--mute-2);
+}
+
 /* Progress area */
 .settings-progress-area {
   margin-top: 12px;
@@ -2242,6 +2270,9 @@ body {
 [data-theme="light"] .settings-theme-btn.active { background: #1c1a17; color: #fff; border-color: #1c1a17; }
 [data-theme="light"] .settings-progress-bar-track { background: #e0dbd4; }
 [data-theme="light"] .settings-installed-text { color: #1a6640; }
+[data-theme="light"] .settings-log-path { color: #666; border-color: #ddd; }
+[data-theme="light"] .settings-secondary-btn { color: #444; border-color: #ccc; }
+[data-theme="light"] .settings-secondary-btn:hover { background: #e8e4de; border-color: #aaa; }
 
 [data-theme="light"] .pdf-preview-limit-banner {
   background: #fff8e1;
