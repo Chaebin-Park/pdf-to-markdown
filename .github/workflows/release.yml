@@ -7,7 +7,7 @@ on:
 
 env:
   UV_VERSION: "0.11.14"
-  TAURI_CLI_VERSION: "2.10"
+  TAURI_CLI_VERSION: "2.10.1"
 
 jobs:
   # ── 1. Ktor server JAR 빌드 ────────────────────────────────────
@@ -79,14 +79,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-tauri
-          key: tauri-cli-${{ runner.os }}-v${{ env.TAURI_CLI_VERSION }}
-
-      - uses: cargo-bins/cargo-binstall@main
-        if: steps.tauri-cli-cache-macos.outputs.cache-hit != 'true'
+          key: tauri-cli-locked-${{ runner.os }}-${{ runner.arch }}-v${{ env.TAURI_CLI_VERSION }}
 
       - name: Install tauri-cli
         if: steps.tauri-cli-cache-macos.outputs.cache-hit != 'true'
-        run: cargo binstall --no-confirm "tauri-cli@~${{ env.TAURI_CLI_VERSION }}"
+        run: cargo install tauri-cli --version "${{ env.TAURI_CLI_VERSION }}" --locked
 
       - uses: actions/setup-node@v4
         with:
@@ -198,14 +195,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-tauri.exe
-          key: tauri-cli-${{ runner.os }}-v${{ env.TAURI_CLI_VERSION }}
-
-      - uses: cargo-bins/cargo-binstall@main
-        if: steps.tauri-cli-cache-windows.outputs.cache-hit != 'true'
+          key: tauri-cli-locked-${{ runner.os }}-${{ runner.arch }}-v${{ env.TAURI_CLI_VERSION }}
 
       - name: Install tauri-cli
         if: steps.tauri-cli-cache-windows.outputs.cache-hit != 'true'
-        run: cargo binstall --no-confirm "tauri-cli@~${{ env.TAURI_CLI_VERSION }}"
+        run: cargo install tauri-cli --version "${{ env.TAURI_CLI_VERSION }}" --locked
 
       - uses: actions/setup-node@v4
         with:
