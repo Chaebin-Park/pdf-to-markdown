@@ -124,6 +124,8 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 /// 앱 설치 디렉터리는 쓰기 권한이 없을 수 있으므로 읽기 전용 리소스 보관에만 사용한다.
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    const JRE_BUNDLE_VERSION: &str = "2";
+
     let runtime_dir = app
         .path()
         .cache_dir()
@@ -134,10 +136,23 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     let java_exe = runtime_dir.join("jre").join("bin").join("java.exe");
     #[cfg(target_os = "macos")]
     let java_exe = runtime_dir.join("jre").join("bin").join("java");
+    let version_file = runtime_dir.join(".jre-bundle-version");
 
-    if java_exe.exists() {
+    let installed_version = std::fs::read_to_string(&version_file).unwrap_or_default();
+    if java_exe.exists() && installed_version.trim() == JRE_BUNDLE_VERSION {
         log::info!("번들 JRE 이미 추출됨: {}", java_exe.display());
         return Some(java_exe);
+    }
+
+    if runtime_dir.exists() {
+        log::info!("이전 번들 JRE 캐시 교체: {}", runtime_dir.display());
+        if let Err(error) = std::fs::remove_dir_all(&runtime_dir) {
+            log::error!(
+                "이전 번들 JRE 캐시 제거 실패: {} ({error})",
+                runtime_dir.display()
+            );
+            return None;
+        }
     }
 
     if let Err(error) = std::fs::create_dir_all(&runtime_dir) {
@@ -184,6 +199,13 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
         .ok()?;
 
     if status.success() && java_exe.exists() {
+        if let Err(error) = std::fs::write(&version_file, JRE_BUNDLE_VERSION) {
+            log::error!(
+                "번들 JRE 버전 파일 기록 실패: {} ({error})",
+                version_file.display()
+            );
+            return None;
+        }
         log::info!("번들 JRE 추출 완료: {}", java_exe.display());
         Some(java_exe)
     } else {

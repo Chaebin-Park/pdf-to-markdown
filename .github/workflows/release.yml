@@ -109,7 +109,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src-tauri/resources/jre.zip
-          key: jre-zip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/app/build/libs/server.jar') }}
+          key: jre-zip-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/app/build/libs/server.jar') }}
 
       - name: Create minimal JRE with jlink (macOS)
         if: steps.jre-cache-macos.outputs.cache-hit != 'true'
@@ -123,7 +123,7 @@ jobs:
             --multi-release 21 \
             server/app/build/libs/server.jar 2>/dev/null || echo "")
 
-          ESSENTIAL="java.base,java.logging,java.management,java.management.rmi,java.rmi,java.naming,java.net.http,java.security.jgss,java.xml,jdk.crypto.ec,jdk.management,jdk.zipfs,java.instrument"
+          ESSENTIAL="java.base,java.desktop,java.logging,java.management,java.management.rmi,java.rmi,java.naming,java.net.http,java.security.jgss,java.xml,jdk.crypto.ec,jdk.management,jdk.zipfs,java.instrument"
           ALL=$(echo "$DETECTED,$ESSENTIAL" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
           echo "포함 모듈: $ALL"
 
@@ -228,7 +228,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src-tauri/resources/jre.zip
-          key: jre-zip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/app/build/libs/server.jar') }}
+          key: jre-zip-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/app/build/libs/server.jar') }}
 
       - name: Create minimal JRE with jlink (Windows)
         if: steps.jre-cache.outputs.cache-hit != 'true'
@@ -246,7 +246,7 @@ jobs:
             server/app/build/libs/server.jar 2>/dev/null || echo "")
 
           # Ktor 서버 필수 모듈 (jdeps가 놓치는 런타임 의존성 포함)
-          ESSENTIAL="java.base,java.logging,java.management,java.management.rmi,java.rmi,java.naming,java.net.http,java.security.jgss,java.xml,jdk.crypto.ec,jdk.management,jdk.zipfs,java.instrument"
+          ESSENTIAL="java.base,java.desktop,java.logging,java.management,java.management.rmi,java.rmi,java.naming,java.net.http,java.security.jgss,java.xml,jdk.crypto.ec,jdk.management,jdk.zipfs,java.instrument"
 
           # 합치고 중복 제거
           ALL=$(echo "$DETECTED,$ESSENTIAL" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
