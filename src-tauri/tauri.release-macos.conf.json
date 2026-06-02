@@ -1,0 +1,9 @@
+{
+  "bundle": {
+    "resources": {
+      "../server/app/build/libs/server.jar": "server.jar",
+      "resources/uv-macos-arm64": "uv-macos-arm64",
+      "resources/jre.zip": "jre.zip"
+    }
+  }
+}

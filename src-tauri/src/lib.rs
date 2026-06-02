@@ -117,12 +117,12 @@ fn uv_binary_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 ///
 /// Windows GUI 앱은 사용자 셸과 다른 환경을 상속받아 PATH에서 java를 못 찾는 경우가 있으므로
 /// JAVA_HOME 및 공통 설치 경로를 먼저 확인한다.
-/// jre.zip 번들을 사용자 캐시 디렉터리에 압축 해제한다 (Windows 전용).
+/// jre.zip 번들을 사용자 캐시 디렉터리에 압축 해제한다.
 ///
 /// 이미 추출되어 있으면 즉시 경로를 반환한다.
-/// 첫 실행 시 PowerShell의 `Expand-Archive`로 `%LOCALAPPDATA%` 아래에 jre.zip을 해제한다.
+/// Windows는 PowerShell `Expand-Archive`, macOS는 `ditto`로 jre.zip을 해제한다.
 /// 앱 설치 디렉터리는 쓰기 권한이 없을 수 있으므로 읽기 전용 리소스 보관에만 사용한다.
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     let runtime_dir = app
         .path()
@@ -130,7 +130,10 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
         .ok()?
         .join("opendataloader")
         .join("runtime");
+    #[cfg(target_os = "windows")]
     let java_exe = runtime_dir.join("jre").join("bin").join("java.exe");
+    #[cfg(target_os = "macos")]
+    let java_exe = runtime_dir.join("jre").join("bin").join("java");
 
     if java_exe.exists() {
         log::info!("번들 JRE 이미 추출됨: {}", java_exe.display());
@@ -156,17 +159,27 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 
     log::info!("번들 JRE 압축 해제 중: {} → {}", zip_path.display(), runtime_dir.display());
 
-    let mut powershell = Command::new("powershell");
-    hide_console_window(&mut powershell);
-    let status = powershell
-        .args([
-            "-NoProfile", "-NonInteractive", "-Command",
-            &format!(
-                "Expand-Archive -Force '{}' '{}'",
-                zip_path.display(),
-                runtime_dir.display()
-            ),
-        ])
+    #[cfg(target_os = "windows")]
+    let status = {
+        let mut powershell = Command::new("powershell");
+        hide_console_window(&mut powershell);
+        powershell
+            .args([
+                "-NoProfile", "-NonInteractive", "-Command",
+                &format!(
+                    "Expand-Archive -Force '{}' '{}'",
+                    zip_path.display(),
+                    runtime_dir.display()
+                ),
+            ])
+            .status()
+            .ok()?
+    };
+    #[cfg(target_os = "macos")]
+    let status = Command::new("ditto")
+        .args(["-x", "-k"])
+        .arg(&zip_path)
+        .arg(&runtime_dir)
         .status()
         .ok()?;
 
@@ -180,7 +193,7 @@ fn ensure_bundled_jre(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 }
 
 fn find_java(bundled_java: Option<std::path::PathBuf>) -> std::path::PathBuf {
-    // 0. 번들된 JRE (Windows 배포판에 포함)
+    // 0. 번들된 JRE (데스크톱 배포판에 포함)
     if let Some(java) = bundled_java {
         if java.exists() {
             log::info!("번들 JRE 사용: {}", java.display());
@@ -591,10 +604,10 @@ pub fn run() {
                 }
             };
 
-            // Windows: jre.zip 번들 압축 해제 후 경로 반환 (이미 해제됐으면 즉시 반환)
-            #[cfg(target_os = "windows")]
+            // 데스크톱: jre.zip 번들 압축 해제 후 경로 반환 (이미 해제됐으면 즉시 반환)
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
             let bundled_java = ensure_bundled_jre(app.handle());
-            #[cfg(not(target_os = "windows"))]
+            #[cfg(not(any(target_os = "windows", target_os = "macos")))]
             let bundled_java: Option<std::path::PathBuf> = None;
 
             // 진단 정보 수집

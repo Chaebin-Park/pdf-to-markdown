@@ -59,6 +59,12 @@ jobs:
           name: server-jar
           path: server/app/build/libs/
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          architecture: aarch64
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
@@ -98,11 +104,48 @@ jobs:
           cp "$UV_BIN" src-tauri/resources/uv-macos-arm64
           chmod +x src-tauri/resources/uv-macos-arm64
 
+      - name: JRE zip 캐시 (macOS)
+        id: jre-cache-macos
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/jre.zip
+          key: jre-zip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/app/build/libs/server.jar') }}
+
+      - name: Create minimal JRE with jlink (macOS)
+        if: steps.jre-cache-macos.outputs.cache-hit != 'true'
+        run: |
+          JAVA_HOME_PATH="$JAVA_HOME"
+          echo "JDK 경로: $JAVA_HOME_PATH"
+
+          DETECTED=$("$JAVA_HOME_PATH/bin/jdeps" \
+            --ignore-missing-deps \
+            --print-module-deps \
+            --multi-release 21 \
+            server/app/build/libs/server.jar 2>/dev/null || echo "")
+
+          ESSENTIAL="java.base,java.logging,java.management,java.management.rmi,java.rmi,java.naming,java.net.http,java.security.jgss,java.xml,jdk.crypto.ec,jdk.management,jdk.zipfs,java.instrument"
+          ALL=$(echo "$DETECTED,$ESSENTIAL" | tr ',' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
+          echo "포함 모듈: $ALL"
+
+          rm -rf src-tauri/resources/jre src-tauri/resources/jre.zip
+          "$JAVA_HOME_PATH/bin/jlink" \
+            --add-modules "$ALL" \
+            --strip-debug \
+            --no-header-files \
+            --no-man-pages \
+            --compress=2 \
+            --output src-tauri/resources/jre
+
+          echo "JRE 크기: $(du -sh src-tauri/resources/jre | cut -f1)"
+          ditto -c -k --keepParent src-tauri/resources/jre src-tauri/resources/jre.zip
+          rm -rf src-tauri/resources/jre
+          echo "jre.zip 크기: $(du -sh src-tauri/resources/jre.zip | cut -f1)"
+
       - name: Build (macOS)
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        run: cargo tauri build --target aarch64-apple-darwin
+        run: cargo tauri build --target aarch64-apple-darwin --config src-tauri/tauri.release-macos.conf.json
 
       - name: Create .app.tar.gz + sign
         env:
@@ -185,7 +228,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src-tauri/resources/jre.zip
-          key: jre-zip-${{ hashFiles('server/app/build/libs/server.jar') }}
+          key: jre-zip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/app/build/libs/server.jar') }}
 
       - name: Create minimal JRE with jlink (Windows)
         if: steps.jre-cache.outputs.cache-hit != 'true'
