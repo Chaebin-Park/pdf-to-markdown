@@ -34,6 +34,16 @@ export function getServerPort(): Promise<number | null> {
   return invoke<number | null>("get_server_port");
 }
 
+/**
+ * 마지막 Ktor 서버 시작 실패 메시지를 반환한다.
+ *
+ * JVM 실행 오류가 WebView 이벤트 구독보다 먼저 발생한 경우에도
+ * 초기 실패 화면을 표시하기 위해 사용한다.
+ */
+export function getServerError(): Promise<string | null> {
+  return invoke<string | null>("get_server_error");
+}
+
 /** Docling 서버 포트를 반환한다. 미기동 시 null. */
 export function getDoclingPort(): Promise<number | null> {
   return invoke<number | null>("get_docling_port");

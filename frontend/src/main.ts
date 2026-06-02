@@ -2,7 +2,7 @@ import "./style.css";
 import "highlight.js/styles/github-dark.css";
 import "katex/dist/katex.min.css";
 import {
-  getServerPort, onServerReady, onServerError, readTextFile,
+  getServerPort, getServerError, onServerReady, onServerError, readTextFile,
   checkHybridInstalled, startDoclingServe, onDoclingReady, getDoclingPort,
 } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
@@ -45,6 +45,14 @@ async function init() {
     renderApp(root);
     initStatusBar(existingPort);
     startJvmPolling(serverBaseUrl);
+    return;
+  }
+
+  // JVM 실행 자체가 실패하면 WebView 구독 전에 오류 이벤트가 발생할 수 있다.
+  // Rust 상태에 보존된 마지막 오류를 조회하여 앱이 조용히 종료된 것처럼 보이지 않게 한다.
+  const existingError = await getServerError();
+  if (existingError != null) {
+    renderServerError(root, existingError);
     return;
   }
 
@@ -98,7 +106,7 @@ function renderServerError(root: HTMLDivElement, message: string): void {
     <div class="splash">
       <p class="splash-label" style="color:#f87171;">서버 시작 실패</p>
       <p style="font-size:12px;color:#9ca3af;max-width:400px;text-align:center;margin-top:8px;">${message}</p>
-      <p style="font-size:11px;color:#6b7280;margin-top:16px;">콘솔(F12)에서 상세 로그를 확인하세요.</p>
+      <p style="font-size:11px;color:#6b7280;margin-top:16px;">위 경로의 로그 파일에서 상세 진단 정보를 확인하세요.</p>
     </div>
   `;
 }

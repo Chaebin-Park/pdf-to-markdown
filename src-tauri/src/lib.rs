@@ -14,6 +14,8 @@ use tauri::{Emitter, Manager};
 struct ServerState {
     /// 서버가 수신 중인 포트. 기동 완료 전에는 `None`.
     port: Mutex<Option<u16>>,
+    /// JVM 부트스트랩 또는 Ktor 기동 실패 메시지. 정상 상태에서는 `None`.
+    error: Mutex<Option<String>>,
 }
 
 /// docling-serve 프로세스의 포트 상태.
@@ -36,6 +38,26 @@ struct DoclingHandle(Arc<Mutex<Option<Child>>>);
 #[tauri::command]
 fn get_server_port(state: tauri::State<ServerState>) -> Option<u16> {
     *state.port.lock().unwrap()
+}
+
+/// 마지막 Ktor 서버 시작 실패 메시지를 반환하는 Tauri command.
+///
+/// JVM 실행 자체가 실패하면 프론트엔드 이벤트 구독보다 먼저 오류가 발생할 수 있다.
+/// 이 command는 저장된 오류를 조회하여 초기 이벤트 유실을 보완한다.
+#[tauri::command]
+fn get_server_error(state: tauri::State<ServerState>) -> Option<String> {
+    state.error.lock().unwrap().clone()
+}
+
+/// 서버 시작 오류를 상태에 저장하고 WebView에 알린다.
+///
+/// WebView 초기화 전에 발생한 이벤트는 프론트엔드가 수신하지 못할 수 있으므로
+/// [get_server_error]로 다시 조회할 수 있도록 상태에도 보존한다.
+fn report_server_error(app: &tauri::AppHandle, message: String) {
+    let state = app.state::<ServerState>();
+    *state.error.lock().unwrap() = Some(message.clone());
+    log::error!("{message}");
+    let _ = app.emit("server-error", message);
 }
 
 /// 하이브리드 모드 Python 환경이 설치되어 있는지 확인하는 Tauri command.
@@ -494,6 +516,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ServerState {
             port: Mutex::new(None),
+            error: Mutex::new(None),
         })
         .manage(DoclingState {
             port: Mutex::new(None),
@@ -506,19 +529,35 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_process::init())?;
             app.handle().plugin(tauri_plugin_dialog::init())?;
             app.handle().plugin(tauri_plugin_fs::init())?;
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
+                    .max_file_size(1_000_000)
+                    .build(),
+            )?;
 
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
-
-            // 번들된 server.jar 경로 조회
-            let jar_path = app
+            let log_dir = app
                 .path()
-                .resolve("server.jar", tauri::path::BaseDirectory::Resource)?;
+                .app_log_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "조회 실패".to_string());
+            // 번들된 server.jar 경로 조회. 실패해도 WebView는 유지하여 진단 정보를 표시한다.
+            let jar_path = match app
+                .path()
+                .resolve("server.jar", tauri::path::BaseDirectory::Resource)
+            {
+                Ok(path) => path,
+                Err(error) => {
+                    report_server_error(
+                        app.handle(),
+                        format!(
+                            "server.jar 리소스 조회 실패: {error}\n로그 디렉토리: {log_dir}"
+                        ),
+                    );
+                    return Ok(());
+                }
+            };
 
             // Windows: jre.zip 번들 압축 해제 후 경로 반환 (이미 해제됐으면 즉시 반환)
             #[cfg(target_os = "windows")]
@@ -543,13 +582,26 @@ pub fn run() {
             log::info!("[진단] 리소스 디렉토리: {resource_dir}");
             log::info!("[진단] 번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})");
             log::info!("[진단] 선택된 java: {java_display}");
+            log::info!("[진단] 로그 디렉토리: {log_dir}");
             log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
-            let mut child = Command::new(&java)
+            let child = Command::new(&java)
                 .arg("-jar")
                 .arg(&jar_path)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
-                .spawn()?;
+                .spawn();
+            let mut child = match child {
+                Ok(child) => child,
+                Err(error) => {
+                    report_server_error(
+                        app.handle(),
+                        format!(
+                            "JVM 실행 실패: {error}\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
+                        ),
+                    );
+                    return Ok(());
+                }
+            };
 
             // stdout에서 PORT= 줄을 읽는 스레드 (나머지 줄은 drain해서 파이프 막힘 방지)
             let stdout = child.stdout.take().expect("stdout not captured");
@@ -588,17 +640,15 @@ pub fn run() {
                         log::info!("Ktor server ready on port {port}");
                     } else {
                         let msg = format!(
-                            "서버 포트 응답 없음.\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}"
+                            "서버 포트 응답 없음.\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
                         );
-                        log::error!("{msg}");
-                        let _ = app_handle.emit("server-error", msg);
+                        report_server_error(&app_handle, msg);
                     }
                 } else {
                     let msg = format!(
-                        "서버 시작 타임아웃 (60초).\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}"
+                        "서버 시작 타임아웃 (60초).\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
                     );
-                    log::error!("{msg}");
-                    let _ = app_handle.emit("server-error", msg);
+                    report_server_error(&app_handle, msg);
                 }
             });
 
@@ -606,6 +656,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_server_port,
+            get_server_error,
             check_hybrid_installed,
             install_hybrid,
             uninstall_hybrid,
