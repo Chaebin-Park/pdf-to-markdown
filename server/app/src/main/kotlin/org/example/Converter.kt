@@ -8,6 +8,7 @@ import org.example.models.ProgressEvent
 import org.opendataloader.pdf.api.Config
 import org.opendataloader.pdf.api.OpenDataLoaderPDF
 import org.opendataloader.pdf.hybrid.HybridConfig
+import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
@@ -17,6 +18,8 @@ import java.io.File
  * 앱 종료 시 [App.kt]에서 한 번만 호출한다. 이 클래스에서는 호출하지 않는다.
  */
 object Converter {
+    /** 변환 실패의 전체 스택 트레이스를 파일 로그에 기록한다. */
+    private val logger = LoggerFactory.getLogger(Converter::class.java)
 
     /**
      * PDF 파일을 변환하고 진행 상황을 SSE 채널로 전송한다.
@@ -52,7 +55,21 @@ object Converter {
                 )
             )
         }.onFailure { e ->
-            JobManager.markError(jobId, e.message ?: "변환 중 알 수 없는 오류 발생")
+            logger.error(
+                "PDF 변환 실패: jobId={}, mode={}, filePath={}",
+                jobId,
+                mode,
+                request.filePath,
+                e
+            )
+            JobManager.markError(
+                jobId = jobId,
+                errorMessage = e.message ?: "변환 중 알 수 없는 오류 발생",
+                errorDetail = e.stackTraceToString()
+                    .lineSequence()
+                    .take(6)
+                    .joinToString("\n")
+            )
         }
     }
 

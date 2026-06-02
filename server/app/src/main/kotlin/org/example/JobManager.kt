@@ -78,10 +78,16 @@ object JobManager {
      *
      * @param jobId 대상 작업 식별자
      * @param errorMessage 오류 메시지
+     * @param errorDetail 클라이언트에 전달할 짧은 오류 상세. 전체 스택 트레이스는 파일 로그에 기록한다.
      */
-    fun markError(jobId: String, errorMessage: String) {
+    fun markError(jobId: String, errorMessage: String, errorDetail: String? = null) {
         statuses[jobId] = JobStatus.ERROR
-        results[jobId] = JobResult(jobId = jobId, status = JobStatus.ERROR.name, error = errorMessage)
+        results[jobId] = JobResult(
+            jobId = jobId,
+            status = JobStatus.ERROR.name,
+            error = errorMessage,
+            errorDetail = errorDetail
+        )
         channels[jobId]?.close()
     }
 

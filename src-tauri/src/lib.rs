@@ -582,11 +582,11 @@ pub fn run() {
                     .build(),
             )?;
 
-            let log_dir = app
-                .path()
-                .app_log_dir()
+            let log_dir_path = app.path().app_log_dir().ok();
+            let log_dir = log_dir_path
+                .as_ref()
                 .map(|p| p.display().to_string())
-                .unwrap_or_else(|_| "조회 실패".to_string());
+                .unwrap_or_else(|| "조회 실패".to_string());
             // 번들된 server.jar 경로 조회. 실패해도 WebView는 유지하여 진단 정보를 표시한다.
             let jar_path = match app
                 .path()
@@ -631,6 +631,9 @@ pub fn run() {
             log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
             let mut java_command = Command::new(&java);
             hide_console_window(&mut java_command);
+            if let Some(path) = &log_dir_path {
+                java_command.env("OPENDATALOADER_LOG_DIR", path);
+            }
             let child = java_command
                 .arg("-jar")
                 .arg(&jar_path)

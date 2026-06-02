@@ -56,6 +56,7 @@ data class ProgressEvent(
  * @property markdownPath 생성된 Markdown 파일 경로. 실패 시 null
  * @property jsonPath 생성된 JSON(bounding box 포함) 파일 경로. 실패 시 null
  * @property error 오류 메시지. 성공 시 null
+ * @property errorDetail 오류 원인 파악을 위한 짧은 상세 정보. 전체 스택 트레이스는 파일 로그에 기록
  */
 @Serializable
 data class JobResult(
@@ -63,5 +64,6 @@ data class JobResult(
     val status: String,
     val markdownPath: String? = null,
     val jsonPath: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val errorDetail: String? = null
 )
