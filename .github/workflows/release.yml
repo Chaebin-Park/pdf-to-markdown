@@ -138,6 +138,9 @@ jobs:
           rm -rf src-tauri/resources/jre
           echo "jre.zip 크기: $(du -sh src-tauri/resources/jre.zip | cut -f1)"
 
+      - name: Verify release resources (macOS)
+        run: node scripts/verify-release-resources.mjs --platform=macos
+
       - name: Build (macOS)
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -261,6 +264,10 @@ jobs:
           powershell -Command "Compress-Archive -Path 'src-tauri\\resources\\jre' -DestinationPath 'src-tauri\\resources\\jre.zip' -Force"
           rm -rf src-tauri/resources/jre
           echo "jre.zip 크기: $(du -sh src-tauri/resources/jre.zip | cut -f1)"
+
+      - name: Verify release resources (Windows)
+        shell: bash
+        run: node scripts/verify-release-resources.mjs --platform=windows
 
       - name: Build (Windows)
         env:

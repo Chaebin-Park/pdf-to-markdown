@@ -4,6 +4,7 @@ import "katex/dist/katex.min.css";
 import {
   getServerPort, getServerError, onServerReady, onServerError, readTextFile,
   checkHybridInstalled, startDoclingServe, onDoclingReady, getDoclingPort,
+  getLogDir,
 } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
 import { mountPdfViewer, setConvertHandler, setCancelHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
@@ -30,6 +31,10 @@ import { registerPanelContent } from "./activity-rail";
  */
 export let serverBaseUrl: string | null = null;
 
+// Matches the Rust startup budget: 60s until PORT= plus 30s TCP readiness.
+const SERVER_BOOT_TIMEOUT_MS = 90_000;
+const SERVER_STATUS_POLL_MS = 1_000;
+
 async function init() {
   initTheme();
   const root = document.querySelector<HTMLDivElement>("#app")!;
@@ -38,38 +43,83 @@ async function init() {
   // docling-serve 자동 시작: Ktor 서버와 병렬로 처리한다.
   initDocling();
 
-  // 앱 재시작 없이 핫리로드된 경우 서버가 이미 기동 중일 수 있으므로 먼저 조회한다.
-  const existingPort = await getServerPort();
-  if (existingPort != null) {
-    serverBaseUrl = `http://localhost:${existingPort}`;
-    renderApp(root);
-    initStatusBar(existingPort);
-    startJvmPolling(serverBaseUrl);
-    return;
-  }
+  await waitForServer(root);
+}
 
-  // JVM 실행 자체가 실패하면 WebView 구독 전에 오류 이벤트가 발생할 수 있다.
-  // Rust 상태에 보존된 마지막 오류를 조회하여 앱이 조용히 종료된 것처럼 보이지 않게 한다.
-  const existingError = await getServerError();
-  if (existingError != null) {
-    renderServerError(root, existingError);
-    return;
-  }
+async function waitForServer(root: HTMLDivElement): Promise<void> {
+  let settled = false;
+  let timeoutId: number | null = null;
+  let pollId: number | null = null;
+  let unlistenReady: (() => void) | null = null;
+  let unlistenError: (() => void) | null = null;
 
-  // 서버가 아직 기동되지 않은 경우 이벤트 대기
-  const unlisten = await onServerReady((port) => {
+  const cleanup = () => {
+    if (timeoutId != null) window.clearTimeout(timeoutId);
+    if (pollId != null) window.clearInterval(pollId);
+    unlistenReady?.();
+    unlistenError?.();
+  };
+
+  const showApp = (port: number) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
     serverBaseUrl = `http://localhost:${port}`;
-    unlisten();
-    unlistenErr();
     renderApp(root);
     initStatusBar(port);
-    startJvmPolling(serverBaseUrl!);
-  });
+    startJvmPolling(serverBaseUrl);
+  };
 
-  const unlistenErr = await onServerError((message) => {
-    unlistenErr();
+  const showError = (message: string) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
     renderServerError(root, message);
-  });
+  };
+
+  // 이벤트 유실을 막기 위해 구독을 먼저 설치한 뒤 현재 Rust 상태를 조회한다.
+  [unlistenReady, unlistenError] = await Promise.all([
+    onServerReady(showApp),
+    onServerError(showError),
+  ]);
+  if (settled) {
+    cleanup();
+    return;
+  }
+
+  const checkServerState = async () => {
+    const [port, error] = await Promise.all([getServerPort(), getServerError()]);
+    if (port != null) {
+      showApp(port);
+      return;
+    }
+    if (error != null) {
+      showError(error);
+    }
+  };
+
+  try {
+    await checkServerState();
+  } catch (e) {
+    showError(`서버 상태 조회 실패: ${String(e)}`);
+    return;
+  }
+
+  if (settled) return;
+
+  pollId = window.setInterval(() => {
+    checkServerState().catch((e) => showError(`서버 상태 조회 실패: ${String(e)}`));
+  }, SERVER_STATUS_POLL_MS);
+
+  timeoutId = window.setTimeout(async () => {
+    let logHint = "";
+    try {
+      logHint = `\n로그 디렉토리: ${await getLogDir()}`;
+    } catch {
+      logHint = "";
+    }
+    showError(`서버 시작 타임아웃 (${SERVER_BOOT_TIMEOUT_MS / 1000}초).${logHint}`);
+  }, SERVER_BOOT_TIMEOUT_MS);
 }
 
 /**
@@ -102,13 +152,31 @@ async function initDocling(): Promise<void> {
 }
 
 function renderServerError(root: HTMLDivElement, message: string): void {
-  root.innerHTML = `
-    <div class="splash">
-      <p class="splash-label" style="color:#f87171;">서버 시작 실패</p>
-      <p style="font-size:12px;color:#9ca3af;max-width:400px;text-align:center;margin-top:8px;">${message}</p>
-      <p style="font-size:11px;color:#6b7280;margin-top:16px;">위 경로의 로그 파일에서 상세 진단 정보를 확인하세요.</p>
-    </div>
-  `;
+  const splash = document.createElement("div");
+  splash.className = "splash";
+
+  const label = document.createElement("p");
+  label.className = "splash-label";
+  label.style.color = "#f87171";
+  label.textContent = "서버 시작 실패";
+
+  const body = document.createElement("p");
+  body.style.fontSize = "12px";
+  body.style.color = "#9ca3af";
+  body.style.maxWidth = "400px";
+  body.style.textAlign = "center";
+  body.style.marginTop = "8px";
+  body.style.whiteSpace = "pre-wrap";
+  body.textContent = message;
+
+  const hint = document.createElement("p");
+  hint.style.fontSize = "11px";
+  hint.style.color = "#6b7280";
+  hint.style.marginTop = "16px";
+  hint.textContent = "위 경로의 로그 파일에서 상세 진단 정보를 확인하세요.";
+
+  splash.append(label, body, hint);
+  root.replaceChildren(splash);
 }
 
 function renderLoading(root: HTMLDivElement): void {

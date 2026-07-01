@@ -34,6 +34,10 @@ struct ServerState {
     error: Mutex<Option<String>>,
 }
 
+const SERVER_PORT_TIMEOUT_SECS: u64 = 60;
+const SERVER_TCP_TIMEOUT_SECS: u64 = 30;
+const SERVER_PROCESS_POLL_MS: u64 = 500;
+
 /// docling-serve 프로세스의 포트 상태.
 ///
 /// 하이브리드 모드가 활성화된 경우에만 사용된다.
@@ -74,6 +78,15 @@ fn report_server_error(app: &tauri::AppHandle, message: String) {
     *state.error.lock().unwrap() = Some(message.clone());
     log::error!("{message}");
     let _ = app.emit("server-error", message);
+}
+
+fn stderr_tail(stderr_summary: &Arc<Mutex<Vec<String>>>) -> String {
+    stderr_summary
+        .lock()
+        .ok()
+        .map(|lines| lines.join("\n"))
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or_else(|| "stderr 출력 없음".to_string())
 }
 
 /// 하이브리드 모드 Python 환경이 설치되어 있는지 확인하는 Tauri command.
@@ -727,11 +740,19 @@ pub fn run() {
                 }
             });
 
-            // stderr를 로그로 출력 (서버 시작 실패 원인 파악용)
+            // stderr를 로그로 출력하고 최근 내용을 보존한다 (서버 시작 실패 원인 파악용).
             let stderr = child.stderr.take().expect("stderr not captured");
+            let stderr_summary = Arc::new(Mutex::new(Vec::<String>::new()));
+            let stderr_summary_for_log = Arc::clone(&stderr_summary);
             thread::spawn(move || {
                 for line in BufReader::new(stderr).lines().map_while(Result::ok) {
                     log::warn!("[server.jar] {line}");
+                    if let Ok(mut lines) = stderr_summary_for_log.lock() {
+                        lines.push(line);
+                        if lines.len() > 20 {
+                            lines.remove(0);
+                        }
+                    }
                 }
             });
 
@@ -739,26 +760,69 @@ pub fn run() {
 
             // 비동기 스레드에서 서버 기동 대기 후 상태 갱신 및 이벤트 emit
             let app_handle = app.handle().clone();
+            let process_handle_for_monitor = Arc::clone(&process_handle);
             thread::spawn(move || {
-                // PORT= 수신 대기 (최대 60초)
-                if let Ok(port) = rx.recv_timeout(Duration::from_secs(60)) {
-                    // TCP 연결이 수락될 때까지 폴링 (최대 30초)
-                    if wait_for_server(port, 30) {
-                        let state = app_handle.state::<ServerState>();
-                        *state.port.lock().unwrap() = Some(port);
-                        let _ = app_handle.emit("server-ready", port);
-                        log::info!("Ktor server ready on port {port}");
-                    } else {
-                        let msg = format!(
-                            "서버 포트 응답 없음.\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
-                        );
-                        report_server_error(&app_handle, msg);
+                let boot_deadline =
+                    std::time::Instant::now() + Duration::from_secs(SERVER_PORT_TIMEOUT_SECS);
+
+                loop {
+                    match rx.recv_timeout(Duration::from_millis(SERVER_PROCESS_POLL_MS)) {
+                        Ok(port) => {
+                            // TCP 연결이 수락될 때까지 폴링한다.
+                            if wait_for_server(port, SERVER_TCP_TIMEOUT_SECS) {
+                                let state = app_handle.state::<ServerState>();
+                                *state.error.lock().unwrap() = None;
+                                *state.port.lock().unwrap() = Some(port);
+                                let _ = app_handle.emit("server-ready", port);
+                                log::info!("Ktor server ready on port {port}");
+                            } else {
+                                let msg = format!(
+                                    "서버 포트 응답 없음.\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
+                                );
+                                report_server_error(&app_handle, msg);
+                            }
+                            return;
+                        }
+                        Err(mpsc::RecvTimeoutError::Timeout) => {
+                            let process_status = process_handle_for_monitor
+                                .lock()
+                                .ok()
+                                .and_then(|mut guard| {
+                                    guard.as_mut().and_then(|child| match child.try_wait() {
+                                        Ok(status) => status,
+                                        Err(error) => {
+                                            log::error!("서버 프로세스 상태 조회 실패: {error}");
+                                            None
+                                        }
+                                    })
+                                });
+
+                            if let Some(status) = process_status {
+                                let stderr_tail = stderr_tail(&stderr_summary);
+                                let msg = format!(
+                                    "서버 프로세스가 PORT= 출력 전 종료됨 (exit: {status}).\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}\n최근 server.jar stderr:\n{stderr_tail}"
+                                );
+                                report_server_error(&app_handle, msg);
+                                return;
+                            }
+
+                            if std::time::Instant::now() >= boot_deadline {
+                                let msg = format!(
+                                    "서버 시작 타임아웃 ({SERVER_PORT_TIMEOUT_SECS}초).\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
+                                );
+                                report_server_error(&app_handle, msg);
+                                return;
+                            }
+                        }
+                        Err(mpsc::RecvTimeoutError::Disconnected) => {
+                            let stderr_tail = stderr_tail(&stderr_summary);
+                            let msg = format!(
+                                "서버 stdout이 PORT= 출력 없이 종료됨.\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}\n최근 server.jar stderr:\n{stderr_tail}"
+                            );
+                            report_server_error(&app_handle, msg);
+                            return;
+                        }
                     }
-                } else {
-                    let msg = format!(
-                        "서버 시작 타임아웃 (60초).\njava: {java_display}\n번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})\n리소스 디렉토리: {resource_dir}\n로그 디렉토리: {log_dir}"
-                    );
-                    report_server_error(&app_handle, msg);
                 }
             });
 
