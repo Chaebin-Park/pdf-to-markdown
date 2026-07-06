@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-07-06 — BBox/변환 안정화
+
+### BUG-07 BBox 오버레이 줌 정합성 깨짐
+**증상**: 50/100/150% 줌에서 PDF 텍스트와 BBox가 수평으로 밀리거나 일부 누락됨
+**원인**:
+- `.pdf-page-wrapper`가 flex 레이아웃으로 동작하면서 centered canvas와 overlay layer의 기준점이 달라짐
+- BBox 좌표 변환이 PDF.js viewport transform이 아니라 `canvas.style.width / scale` 기반 추정값을 사용해 crop/rounding/transform과 어긋날 수 있음
+
+**수정**:
+- PDF 렌더링 시 viewport width/height/transform을 canvas dataset에 저장
+- BBox 좌표를 PDF.js viewport transform으로 CSS 픽셀에 변환
+- overlay layer를 실제 canvas offset에 맞추고 canvas bounds 바깥 rect는 clipping
+- page wrapper를 `fit-content` + `margin: auto` + `flex: none` 기준으로 안정화
+
+**검증**: `npm run build`, `git diff --check` 통과. `fixed_50.png`, `fixed_100.png`, `fixed_150.png` 기준 50/100/150% BBox 시각 회귀 확인 완료. macOS/Windows 모두 정상 동작 확인. BBox 재연산 지연은 남아 있으나 정합성은 정상
+
+---
+
+### BUG-08 변환 완료 후 UI가 "알 수 없는 변환 오류" 표시
+**증상**: PDF 변환 결과 Markdown/JSON이 생성되는데도 프론트엔드가 `오류: 알 수 없는 변환 오류가 발생했습니다.`를 표시함
+**원인**: SSE 연결이 먼저 닫히거나 일시 오류가 난 직후 `/result/{jobId}`가 아직 `202 RUNNING`이면, 프론트엔드가 이를 최종 실패로 오인함
+**수정**:
+- `/result/{jobId}`가 `DONE` 또는 `ERROR`가 될 때까지 폴링하는 `waitForResult()` 추가
+- 취소 중 발생한 폴링 오류가 사용자 오류로 표시되지 않도록 방어
+- 누락돼 있던 `HYBRID_FULL` 프론트엔드 타입 추가
+
+**검증**: `npm run build` 통과. 직접 `/convert` 요청에서 `DONE`과 `markdownPath`/`jsonPath` 반환 확인
+
+---
+
+### BUG-09 PDFBox/JDK 모듈 접근 ERROR 로그
+**증상**: `server.log`에 `Unmapping is not supported`, `java.base does not "opens java.nio"`, `jdk.internal.ref.Cleaner` 계열 ERROR가 출력됨
+**원인**: 최신 JRE module encapsulation 때문에 PDFBox 내부 unmapper reflection/native access가 차단됨
+**수정**:
+- JVM 서버 실행 인자에 `--add-opens=java.base/java.nio=ALL-UNNAMED` 추가
+- `--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED`, `--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED` 추가
+- `--enable-native-access=ALL-UNNAMED` 추가
+
+**검증**: `cargo check`, dev app restart, `/health` OK. 최종 JVM 옵션 적용 후 변환 결과 md/json 생성 및 live app output에서 새 PDFBox unmapping ERROR 미발생 확인
+
+---
+
 ## 2026-05-18 — Phase 3 첫 테스트 버그 수정
 
 ### BUG-01 드래그앤드롭 미동작
@@ -81,5 +123,5 @@
 | 파일 선택 → PDF 미리보기 | ✅ |
 | 드래그앤드롭 → PDF 미리보기 | ✅ |
 | [변환] → Markdown 출력 | ✅ |
-| BBox 오버레이 | 미확인 (변환 성공 후 JSON 있으면 동작 예상) |
+| BBox 오버레이 | ✅ 줌 정합성 수정 및 macOS/Windows 시각 검증 완료 |
 | Hybrid/OCR/Formula 모드 | 미테스트 (docling-serve 설치 필요) |

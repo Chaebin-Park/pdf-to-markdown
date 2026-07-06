@@ -11,8 +11,8 @@
  *     "content"?, "kids"?, "rows"?, "cells"?, "list items"? }
  *
  * 좌표계 변환:
- *   PDF 좌표계는 좌하단 원점 (Y 증가 방향 = 위쪽).
- *   Canvas/CSS는 좌상단 원점이므로 Y = pageH - topY 로 반전한다.
+ *   PDF.js가 렌더링에 사용한 viewport transform을 canvas dataset에서 읽어
+ *   PDF 좌표를 CSS 픽셀 좌표로 변환한다.
  */
 
 // ---------------------------------------------------------------------------
@@ -108,6 +108,61 @@ function attachTooltip(el: HTMLDivElement, label: string): void {
 
 const TOP_LEVEL_TYPES = new Set(["paragraph", "heading", "table", "list", "image", "formula"]);
 
+type ViewportTransform = [number, number, number, number, number, number];
+
+interface CanvasRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function parseNumberList(value: string | undefined, expectedLength: number): number[] | null {
+  if (!value) return null;
+  const numbers = value.split(",").map((part) => Number(part));
+  if (numbers.length !== expectedLength || numbers.some((n) => !Number.isFinite(n))) return null;
+  return numbers;
+}
+
+function applyViewportTransform(x: number, y: number, transform: ViewportTransform): [number, number] {
+  const [a, b, c, d, e, f] = transform;
+  return [a * x + c * y + e, b * x + d * y + f];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function bboxToCanvasRect(
+  bbox: [number, number, number, number],
+  transform: ViewportTransform,
+  viewportW: number,
+  viewportH: number,
+  canvasW: number,
+  canvasH: number,
+): CanvasRect | null {
+  const [lx, by, rx, ty] = bbox;
+  const points = [
+    applyViewportTransform(lx, by, transform),
+    applyViewportTransform(rx, by, transform),
+    applyViewportTransform(rx, ty, transform),
+    applyViewportTransform(lx, ty, transform),
+  ];
+  const cssScaleX = canvasW / viewportW;
+  const cssScaleY = canvasH / viewportH;
+  const xs = points.map(([x]) => x * cssScaleX);
+  const ys = points.map(([, y]) => y * cssScaleY);
+
+  const left = clamp(Math.min(...xs), 0, canvasW);
+  const top = clamp(Math.min(...ys), 0, canvasH);
+  const right = clamp(Math.max(...xs), 0, canvasW);
+  const bottom = clamp(Math.max(...ys), 0, canvasH);
+  const w = right - left;
+  const h = bottom - top;
+  if (w <= 0 || h <= 0) return null;
+  return { x: left, y: top, w, h };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -201,28 +256,27 @@ function renderOverlays(): void {
     const canvas = wrapper.querySelector<HTMLCanvasElement>("canvas");
     if (!canvas) continue;
 
-    // CSS 픽셀 기준 캔버스 크기
-    const canvasW = parseFloat(canvas.style.width);
-    const canvasH = parseFloat(canvas.style.height);
-    const scale = Number(canvas.dataset.scale);
-    if (!scale || !canvasW || !canvasH) continue;
-
-    // PDF 포인트 단위 페이지 크기
-    const pageW = canvasW / scale;
-    const pageH = canvasH / scale;
+    // CSS 픽셀 기준 캔버스 크기와 PDF.js viewport 변환값을 같은 기준으로 사용한다.
+    const canvasBox = canvas.getBoundingClientRect();
+    const canvasW = canvasBox.width || parseFloat(canvas.style.width);
+    const canvasH = canvasBox.height || parseFloat(canvas.style.height);
+    const viewportW = Number(canvas.dataset.viewportWidth);
+    const viewportH = Number(canvas.dataset.viewportHeight);
+    const transformValues = parseNumberList(canvas.dataset.viewportTransform, 6);
+    if (!canvasW || !canvasH || !viewportW || !viewportH || !transformValues) continue;
+    const transform = transformValues as ViewportTransform;
 
     const layer = document.createElement("div");
     layer.className = "bbox-layer";
-    layer.style.cssText = `position:absolute;top:0;left:0;width:${canvasW}px;height:${canvasH}px;pointer-events:none;`;
+    layer.style.cssText =
+      `position:absolute;top:${canvas.offsetTop}px;left:${canvas.offsetLeft}px;` +
+      `width:${canvasW}px;height:${canvasH}px;pointer-events:none;`;
 
     let orderIdx = 0;
     for (const item of pageItems) {
-      const [lx, by, rx, ty] = item.bbox;
-      const x = (lx / pageW) * canvasW;
-      const y = ((pageH - ty) / pageH) * canvasH; // Y 반전
-      const w = ((rx - lx) / pageW) * canvasW;
-      const h = ((ty - by) / pageH) * canvasH;
-      if (w <= 0 || h <= 0) continue;
+      const rectBounds = bboxToCanvasRect(item.bbox, transform, viewportW, viewportH, canvasW, canvasH);
+      if (!rectBounds) continue;
+      const { x, y, w, h } = rectBounds;
 
       if (visible) {
         const fill = TYPE_FILL[item.type] ?? DEFAULT_FILL;

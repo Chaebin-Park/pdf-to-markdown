@@ -309,7 +309,7 @@ async function openBuffer(buffer: ArrayBuffer, name: string): Promise<void> {
 
   dropzone.style.display = "none";
   toolbar.style.display = "flex";
-  pages.style.display = "block";
+  pages.style.display = "flex";
   pages.innerHTML = "";
 
   zoomLevel = 1.0;
@@ -424,13 +424,18 @@ function buildCanvas(page: PDFPageProxy, containerWidth: number): HTMLCanvasElem
   const baseViewport = page.getViewport({ scale: 1 });
   const scale = Math.max(0.5, (containerWidth * zoomLevel) / baseViewport.width);
   const viewport = page.getViewport({ scale });
+  const viewportWidth = Math.floor(viewport.width);
+  const viewportHeight = Math.floor(viewport.height);
 
   const canvas = document.createElement("canvas");
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
-  canvas.style.width = `${Math.floor(viewport.width)}px`;
-  canvas.style.height = `${Math.floor(viewport.height)}px`;
+  canvas.width = viewportWidth;
+  canvas.height = viewportHeight;
+  canvas.style.width = `${viewportWidth}px`;
+  canvas.style.height = `${viewportHeight}px`;
   canvas.dataset.scale = String(scale);
+  canvas.dataset.viewportWidth = String(viewport.width);
+  canvas.dataset.viewportHeight = String(viewport.height);
+  canvas.dataset.viewportTransform = viewport.transform.join(",");
   return canvas;
 }
 

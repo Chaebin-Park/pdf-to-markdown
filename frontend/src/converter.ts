@@ -19,7 +19,7 @@ import { serverBaseUrl } from "./main";
 // Types (mirrors Kotlin Models.kt)
 // ---------------------------------------------------------------------------
 
-export type ConvertMode = "STANDARD" | "HYBRID" | "OCR" | "FORMULA";
+export type ConvertMode = "STANDARD" | "HYBRID" | "HYBRID_FULL" | "OCR" | "FORMULA";
 
 interface ConvertResponse {
   jobId: string;
@@ -60,6 +60,9 @@ export interface ConversionCallbacks {
 
 let activeEventSource: EventSource | null = null;
 let conversionCancelled = false;
+
+const RESULT_POLL_INTERVAL_MS = 1000;
+const RESULT_POLL_TIMEOUT_MS = 30 * 60 * 1000;
 
 /** 진행 중인 변환을 취소한다. SSE 연결을 닫고 이후 단계를 건너뛴다. */
 export function cancelConversion(): void {
@@ -128,16 +131,14 @@ export async function convertPdf(
   // 4. 결과 조회
   let result: JobResult;
   try {
-    const res = await fetch(`${base}/result/${jobId}`);
-    if (!res.ok) {
-      callbacks.onError(`결과 조회 실패: HTTP ${res.status}`);
-      return;
-    }
-    result = await res.json();
+    result = await waitForResult(base, jobId, callbacks.onProgress);
   } catch (e) {
+    if (conversionCancelled) return;
     callbacks.onError(`결과 조회 오류: ${e}`);
     return;
   }
+
+  if (conversionCancelled) return;
 
   if (result.status === "ERROR" || !result.markdownPath) {
     callbacks.onError(
@@ -193,9 +194,47 @@ function listenProgress(
     };
 
     es.onerror = () => {
-      // 서버가 스트림을 닫으면 onerror가 발생한다 (정상 종료 포함)
+      // 서버가 스트림을 닫거나 브라우저가 일시 오류를 감지하면 onerror가 발생한다.
+      // 이후 /result 폴링에서 최종 DONE/ERROR 상태를 확인한다.
       es.close();
       resolve();
     };
   });
+}
+
+async function waitForResult(
+  base: string,
+  jobId: string,
+  onProgress: (e: ProgressEvent) => void,
+): Promise<JobResult> {
+  const startedAt = Date.now();
+  let notifiedWaiting = false;
+
+  while (!conversionCancelled) {
+    const res = await fetch(`${base}/result/${jobId}`);
+    if (!res.ok && res.status !== 202) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json() as Partial<JobResult>;
+    if (data.status === "DONE" || data.status === "ERROR") {
+      return data as JobResult;
+    }
+
+    if (!notifiedWaiting) {
+      notifiedWaiting = true;
+      onProgress({ step: 4, label: "결과 정리 중", percent: 95, eta: null });
+    }
+
+    if (Date.now() - startedAt > RESULT_POLL_TIMEOUT_MS) {
+      throw new Error("결과 조회 시간 초과");
+    }
+    await sleep(RESULT_POLL_INTERVAL_MS);
+  }
+
+  throw new Error("변환이 취소되었습니다.");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

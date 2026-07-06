@@ -701,13 +701,26 @@ pub fn run() {
             log::info!("[진단] 번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})");
             log::info!("[진단] 선택된 java: {java_display}");
             log::info!("[진단] 로그 디렉토리: {log_dir}");
-            log::info!("Launching Ktor server: {} -jar {}", java.display(), jar_path.display());
+            let java_args = [
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+                "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+                "--enable-native-access=ALL-UNNAMED",
+            ];
+
+            log::info!(
+                "Launching Ktor server: {} {} -jar {}",
+                java.display(),
+                java_args.join(" "),
+                jar_path.display()
+            );
             let mut java_command = Command::new(&java);
             hide_console_window(&mut java_command);
             if let Some(path) = &log_dir_path {
                 java_command.env("OPENDATALOADER_LOG_DIR", path);
             }
             let child = java_command
+                .args(java_args)
                 .arg("-jar")
                 .arg(&jar_path)
                 .stdout(Stdio::piped())
