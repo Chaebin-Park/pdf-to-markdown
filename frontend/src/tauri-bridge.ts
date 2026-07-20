@@ -21,6 +21,17 @@ export interface InstallProgress {
   percent: number;
 }
 
+export type DoclingProfile = "hybrid" | "ocr" | "formula";
+
+export interface HybridDiagnostics {
+  installed: boolean;
+  expectedVersion: string;
+  installedVersion: string | null;
+  runningProfile: DoclingProfile | null;
+  port: number | null;
+  error: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -54,6 +65,11 @@ export function checkHybridInstalled(): Promise<boolean> {
   return invoke<boolean>("check_hybrid_installed");
 }
 
+/** 설치 버전, 실행 프로필, 포트와 마지막 오류를 반환한다. */
+export function getHybridDiagnostics(): Promise<HybridDiagnostics> {
+  return invoke<HybridDiagnostics>("get_hybrid_diagnostics");
+}
+
 /**
  * Hybrid 모드를 설치한다.
  * 진행률은 `hybrid-install-progress` / `hybrid-install-log` 이벤트로 수신한다.
@@ -63,8 +79,8 @@ export function installHybrid(): Promise<void> {
 }
 
 /** Docling 서버를 기동한다. 준비 완료 시 `docling-ready` 이벤트가 발행된다. */
-export function startDoclingServe(): Promise<void> {
-  return invoke<void>("start_docling_serve");
+export function startDoclingServe(profile: DoclingProfile = "hybrid"): Promise<void> {
+  return invoke<void>("start_docling_serve", { profile });
 }
 
 /** 하이브리드 모드 환경(venv + 플래그 파일)을 삭제하고 docling-serve를 종료한다. */

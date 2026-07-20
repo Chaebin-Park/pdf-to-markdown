@@ -7,7 +7,6 @@
  */
 
 import {
-  checkHybridInstalled,
   installHybrid,
   uninstallHybrid,
   onInstallProgress,
@@ -15,6 +14,7 @@ import {
   startDoclingServe,
   onDoclingReady,
   getLogDir,
+  getHybridDiagnostics,
   openLogDir,
   type InstallProgress,
 } from "./tauri-bridge";
@@ -29,18 +29,22 @@ import { getTheme, setTheme, type ThemeMode } from "./theme";
 export async function showSettings(): Promise<void> {
   if (document.getElementById("settings-modal")) return;
 
-  const [installed, logDir] = await Promise.all([
-    checkHybridInstalled(),
+  const [diagnostics, logDir] = await Promise.all([
+    getHybridDiagnostics(),
     getLogDir(),
   ]);
-  renderModal(installed, logDir);
+  renderModal(diagnostics.installed, logDir, diagnostics);
 }
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
-function renderModal(installed: boolean, logDir: string): void {
+function renderModal(
+  installed: boolean,
+  logDir: string,
+  diagnostics: Awaited<ReturnType<typeof getHybridDiagnostics>>,
+): void {
   const modal = document.createElement("div");
   modal.id = "settings-modal";
   modal.className = "settings-backdrop";
@@ -63,6 +67,8 @@ function renderModal(installed: boolean, logDir: string): void {
           Hybrid · OCR · Formula 변환 모드에 필요합니다.
           최초 설치 시 Python 환경과 패키지를 다운로드합니다 (약 1~2GB).
         </p>
+        <code class="settings-log-path">예상 버전: ${escapeHtml(diagnostics.expectedVersion)} · 설치 버전: ${escapeHtml(diagnostics.installedVersion ?? "없음")} · 실행 프로필: ${escapeHtml(diagnostics.runningProfile ?? "중지됨")} · 포트: ${diagnostics.port ?? "-"}</code>
+        ${diagnostics.error ? `<p class="settings-section-desc">최근 오류: ${escapeHtml(diagnostics.error)}</p>` : ""}
 
         <div class="settings-install-area" id="settings-install-area">
           ${installed ? renderInstalledState() : renderInstallButton()}
