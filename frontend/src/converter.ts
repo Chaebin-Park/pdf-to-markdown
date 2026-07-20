@@ -14,6 +14,11 @@
 import { saveTempPdf, readTextFile } from "./tauri-bridge";
 import { inlineImages } from "./image-inliner";
 import { serverBaseUrl } from "./main";
+import {
+  pollConversionResult,
+  type JobResult,
+  type ProgressEvent,
+} from "./result-polling";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors Kotlin Models.kt)
@@ -23,22 +28,6 @@ export type ConvertMode = "STANDARD" | "HYBRID" | "HYBRID_FULL" | "OCR" | "FORMU
 
 interface ConvertResponse {
   jobId: string;
-}
-
-interface ProgressEvent {
-  step: number;
-  label: string;
-  percent: number;
-  eta: number | null;
-}
-
-interface JobResult {
-  jobId: string;
-  status: "PENDING" | "RUNNING" | "DONE" | "ERROR";
-  markdownPath: string | null;
-  jsonPath: string | null;
-  error: string | null;
-  errorDetail: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,9 +49,6 @@ export interface ConversionCallbacks {
 
 let activeEventSource: EventSource | null = null;
 let conversionCancelled = false;
-
-const RESULT_POLL_INTERVAL_MS = 1000;
-const RESULT_POLL_TIMEOUT_MS = 30 * 60 * 1000;
 
 /** 진행 중인 변환을 취소한다. SSE 연결을 닫고 이후 단계를 건너뛴다. */
 export function cancelConversion(): void {
@@ -131,7 +117,9 @@ export async function convertPdf(
   // 4. 결과 조회
   let result: JobResult;
   try {
-    result = await waitForResult(base, jobId, callbacks.onProgress);
+    result = await pollConversionResult(base, jobId, callbacks.onProgress, {
+      isCancelled: () => conversionCancelled,
+    });
   } catch (e) {
     if (conversionCancelled) return;
     callbacks.onError(`결과 조회 오류: ${e}`);
@@ -200,41 +188,4 @@ function listenProgress(
       resolve();
     };
   });
-}
-
-async function waitForResult(
-  base: string,
-  jobId: string,
-  onProgress: (e: ProgressEvent) => void,
-): Promise<JobResult> {
-  const startedAt = Date.now();
-  let notifiedWaiting = false;
-
-  while (!conversionCancelled) {
-    const res = await fetch(`${base}/result/${jobId}`);
-    if (!res.ok && res.status !== 202) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data = await res.json() as Partial<JobResult>;
-    if (data.status === "DONE" || data.status === "ERROR") {
-      return data as JobResult;
-    }
-
-    if (!notifiedWaiting) {
-      notifiedWaiting = true;
-      onProgress({ step: 4, label: "결과 정리 중", percent: 95, eta: null });
-    }
-
-    if (Date.now() - startedAt > RESULT_POLL_TIMEOUT_MS) {
-      throw new Error("결과 조회 시간 초과");
-    }
-    await sleep(RESULT_POLL_INTERVAL_MS);
-  }
-
-  throw new Error("변환이 취소되었습니다.");
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
