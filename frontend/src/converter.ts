@@ -19,6 +19,7 @@ import {
   type JobResult,
   type ProgressEvent,
 } from "./result-polling";
+import { conversionRequestBody, type ConversionQualityOptions } from "./conversion-options";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors Kotlin Models.kt)
@@ -71,6 +72,7 @@ export function cancelConversion(): void {
 export async function convertPdf(
   pdfBuffer: ArrayBuffer,
   mode: ConvertMode,
+  options: ConversionQualityOptions,
   callbacks: ConversionCallbacks,
 ): Promise<void> {
   conversionCancelled = false;
@@ -96,7 +98,7 @@ export async function convertPdf(
     const res = await fetch(`${base}/convert`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath, mode }),
+      body: JSON.stringify(conversionRequestBody(filePath, mode, options)),
     });
     if (!res.ok) {
       callbacks.onError(`변환 요청 실패: HTTP ${res.status}`);

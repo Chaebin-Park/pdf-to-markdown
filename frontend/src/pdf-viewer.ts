@@ -14,6 +14,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { refreshBBoxOverlay, clearBBox, toggleOrderOverlay } from "./bbox-overlay";
 import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
 import { openPdfFile } from "./tauri-bridge";
+import { DEFAULT_QUALITY_OPTIONS, type ConversionQualityOptions } from "./conversion-options";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -196,6 +197,27 @@ export function mountPdfViewer(container: HTMLElement): void {
           </span>
         </div>
         <span class="pdf-mode-warning" id="pdf-mode-warning" style="display:none" title="docling-serve가 준비되지 않았습니다. 설정에서 Hybrid 모드를 설치하세요.">⚠</span>
+        <details class="quality-options">
+          <summary>품질 설정</summary>
+          <div class="quality-options-popover">
+            <label>읽기 순서
+              <select id="quality-reading-order">
+                <option value="AUTO">자동 (구조 트리 → XY-Cut)</option>
+                <option value="STRUCT_TREE">구조 트리만</option>
+                <option value="XY_CUT">XY-Cut만</option>
+              </select>
+            </label>
+            <label><input id="quality-header-footer" type="checkbox"> 머리글·바닥글 포함</label>
+            <label><input id="quality-line-breaks" type="checkbox"> 원본 줄바꿈 유지</label>
+            <hr>
+            <span class="quality-filter-title">콘텐츠 보호 필터</span>
+            <label><input id="filter-hidden-text" type="checkbox"> 숨겨진 텍스트 제거</label>
+            <label><input id="filter-out-of-page" type="checkbox" checked> 페이지 밖 텍스트 제거</label>
+            <label><input id="filter-tiny-text" type="checkbox" checked> 극소 텍스트 제거</label>
+            <label><input id="filter-hidden-ocg" type="checkbox" checked> 숨겨진 레이어 제거</label>
+            <p class="quality-risk-warning" id="quality-risk-warning" hidden>⚠ 보호 필터를 끄면 숨겨진 콘텐츠가 결과에 포함될 수 있습니다.</p>
+          </div>
+        </details>
       </div>
       <div class="pdf-pages" id="pdf-pages" style="display:none"></div>
     </div>
@@ -205,6 +227,7 @@ export function mountPdfViewer(container: HTMLElement): void {
   registerDragAndDrop(container);
   registerFileInput(container);
   registerModeWarning();
+  registerQualityOptions();
   registerOpenDialog();
   initZoomControls();
   renderRecentFiles();
@@ -234,6 +257,32 @@ export function setCancelHandler(handler: () => void): void {
 export function getSelectedMode(): string {
   const sel = document.getElementById("pdf-mode-select") as HTMLSelectElement | null;
   return sel?.value ?? "STANDARD";
+}
+
+export function getConversionQualityOptions(): ConversionQualityOptions {
+  const checked = (id: string, fallback: boolean) =>
+    (document.getElementById(id) as HTMLInputElement | null)?.checked ?? fallback;
+  const readingOrder = (document.getElementById("quality-reading-order") as HTMLSelectElement | null)?.value;
+  return {
+    readingOrder: readingOrder === "STRUCT_TREE" || readingOrder === "XY_CUT" ? readingOrder : "AUTO",
+    includeHeaderFooter: checked("quality-header-footer", DEFAULT_QUALITY_OPTIONS.includeHeaderFooter),
+    keepLineBreaks: checked("quality-line-breaks", DEFAULT_QUALITY_OPTIONS.keepLineBreaks),
+    filterHiddenText: checked("filter-hidden-text", DEFAULT_QUALITY_OPTIONS.filterHiddenText),
+    filterOutOfPage: checked("filter-out-of-page", DEFAULT_QUALITY_OPTIONS.filterOutOfPage),
+    filterTinyText: checked("filter-tiny-text", DEFAULT_QUALITY_OPTIONS.filterTinyText),
+    filterHiddenOcg: checked("filter-hidden-ocg", DEFAULT_QUALITY_OPTIONS.filterHiddenOcg),
+  };
+}
+
+function registerQualityOptions(): void {
+  const warning = document.getElementById("quality-risk-warning");
+  const protectedFilters = ["filter-out-of-page", "filter-tiny-text", "filter-hidden-ocg"];
+  const updateWarning = () => {
+    const risky = protectedFilters.some((id) => !(document.getElementById(id) as HTMLInputElement).checked);
+    if (warning) warning.hidden = !risky;
+  };
+  protectedFilters.forEach((id) => document.getElementById(id)?.addEventListener("change", updateWarning));
+  updateWarning();
 }
 
 /**

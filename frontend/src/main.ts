@@ -7,7 +7,7 @@ import {
   getLogDir,
 } from "./tauri-bridge";
 import { mountLayout, getPanelLeft, getPanelRight } from "./layout";
-import { mountPdfViewer, setConvertHandler, setCancelHandler, setConverting, setBBoxAvailable, getSelectedMode, currentPdfBuffer } from "./pdf-viewer";
+import { mountPdfViewer, setConvertHandler, setCancelHandler, setConverting, setBBoxAvailable, getSelectedMode, getConversionQualityOptions, currentPdfBuffer } from "./pdf-viewer";
 import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
 import { convertPdf, cancelConversion } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
@@ -246,7 +246,7 @@ function renderApp(root: HTMLDivElement): void {
     let conversionStartTime = Date.now();
     setStatusMode(mode);
     setStatusIdle();
-    await convertPdf(buffer, mode, {
+    await convertPdf(buffer, mode, getConversionQualityOptions(), {
       onProgress: (event) => {
         updateProgress({ percent: event.percent, label: event.label, eta: event.eta });
       },

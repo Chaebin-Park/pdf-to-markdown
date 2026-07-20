@@ -1491,6 +1491,20 @@ body {
   flex-shrink: 0;
 }
 
+.quality-options { position: relative; font-size: 12px; }
+.quality-options > summary { cursor: pointer; color: var(--mute-2); white-space: nowrap; }
+.quality-options-popover {
+  position: absolute; z-index: 20; right: 0; top: 24px; width: 260px;
+  padding: 12px; border: 1px solid var(--line-solid); border-radius: 6px;
+  background: var(--ink-2); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.quality-options-popover label { display: flex; gap: 7px; align-items: center; margin: 7px 0; }
+.quality-options-popover label:first-child { justify-content: space-between; }
+.quality-options-popover select { max-width: 170px; }
+.quality-options-popover hr { border: 0; border-top: 1px solid var(--line-solid); }
+.quality-filter-title { color: var(--mute-2); }
+.quality-risk-warning { margin: 8px 0 0; color: #e5c07b; line-height: 1.35; }
+
 /* -------------------------------------------------------------------------
    Settings button (⚙) in help-bar
    ---------------------------------------------------------------------- */
