@@ -1,11 +1,15 @@
 {
-  "version": "0.1.0",
-  "notes": "Initial release",
-  "pub_date": "2026-05-19T00:00:00Z",
+  "version": "0.8.7",
+  "notes": "See https://github.com/Chaebin-Park/pdf-to-markdown/releases/tag/v0.8.7",
+  "pub_date": "2026-07-06T13:19:16Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWE9IK0hHVmpzK1dEQzFUOXNGMDRDcGFIRFZ6djhyWVIzb2dqWEw5dk5BTGZhRldmaVdqbHdxYnJKaXRVSkVZZkJUYWhsb2pqNHpGSkwrRDdFek1seEx0eTg5bWJtc2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MTkwMDk1CWZpbGU6cGRmLXRvLW1hcmtkb3duLmFwcC50YXIuZ3oKSEhJZC9Da0UvR3B5Z1NNVlVjM1g4NjdnODZQUHd2TUhMZDkyK3RmTDFtOWxuSWlaN0FsTkVoU3J5TTJyR2hvSFp3QzlqS1d5RjZKT2VYOER2T3A5REE9PQo=",
-      "url": "https://github.com/Chaebin-Park/pdf-to-markdown/releases/download/v0.1.0/pdf-to-markdown.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWE9IK0hHVmpzK2VxZmZ2QzNiZXVTTG9zREN2cm9uNWhkVE9yMzEwRzdzeTdMYWFSdzlwNUJuZ3ZYZHlBckNidEZIcFB1MUFXSVBKckhVKzdGRTdwU2pIRlk3elR6OFFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzMzQzMzM5CWZpbGU6cGRmLXRvLW1hcmtkb3duLmFwcC50YXIuZ3oKc3pWMFYrS0YwMFBHM2lPQWFJcHJ3NW0rMXlpT2h6czRVNnVnVlp2dFVRb1UyajdDU3Z4S0M1bDlDLzdCWGsvZUtXWVVqWUQzVFQzbTFCTXR6YlBlQkE9PQo=",
+      "url": "https://github.com/Chaebin-Park/pdf-to-markdown/releases/download/v0.8.7/pdf-to-markdown.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWE9IK0hHVmpzK1ZuVFdSM25xR0tNbVJYQVJ2U2Vhd2l6WWM4Q0pUNTdGNXZlZG9vTEFMbmJrM2t4Tkc2MFFVdGM4VVltNUlBRGF6SXczLzJLamhiYnBUZlFFZTIveWc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzMzQzODk0CWZpbGU6cGRmLXRvLW1hcmtkb3duXzAuOC43X3g2NC1zZXR1cC5leGUKU1dUV0JvNWR0VXZqL0FzTHRDdmZNN2hBdFc4UFJ5VHZOdlR5VytUMGNxRVhZV01nUTZBT1czc05KTWNsMGx2dmZjNVl2WURwVEU3cytGaWNLM2NtQnc9PQo=",
+      "url": "https://github.com/Chaebin-Park/pdf-to-markdown/releases/download/v0.8.7/pdf-to-markdown_0.8.7_x64-setup.exe"
     }
   }
 }
