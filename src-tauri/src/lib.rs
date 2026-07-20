@@ -1,5 +1,7 @@
+use std::ffi::OsString;
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -37,6 +39,25 @@ struct ServerState {
 const SERVER_PORT_TIMEOUT_SECS: u64 = 60;
 const SERVER_TCP_TIMEOUT_SECS: u64 = 30;
 const SERVER_PROCESS_POLL_MS: u64 = 500;
+
+/// PDFBox가 사용하는 JVM 내부 API와 네이티브 접근을 허용하는 Ktor 서버 실행 인자.
+///
+/// 이 인자들은 `-jar`보다 먼저 전달되어야 JVM 옵션으로 해석된다.
+const KTOR_JVM_ARGS: &[&str] = &[
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+    "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+    "--enable-native-access=ALL-UNNAMED",
+];
+
+/// JVM을 실행하지 않고 Ktor 서버의 전체 명령 인자 목록을 구성한다.
+fn ktor_server_args(jar_path: &Path) -> Vec<OsString> {
+    KTOR_JVM_ARGS
+        .iter()
+        .map(OsString::from)
+        .chain([OsString::from("-jar"), jar_path.as_os_str().to_owned()])
+        .collect()
+}
 
 /// docling-serve 프로세스의 포트 상태.
 ///
@@ -701,18 +722,16 @@ pub fn run() {
             log::info!("[진단] 번들 JRE: {bundled_jre_display} (존재: {bundled_jre_exists})");
             log::info!("[진단] 선택된 java: {java_display}");
             log::info!("[진단] 로그 디렉토리: {log_dir}");
-            let java_args = [
-                "--add-opens=java.base/java.nio=ALL-UNNAMED",
-                "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
-                "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
-                "--enable-native-access=ALL-UNNAMED",
-            ];
+            let java_args = ktor_server_args(&jar_path);
 
             log::info!(
-                "Launching Ktor server: {} {} -jar {}",
+                "Launching Ktor server: {} {}",
                 java.display(),
-                java_args.join(" "),
-                jar_path.display()
+                java_args
+                    .iter()
+                    .map(|arg| arg.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(" ")
             );
             let mut java_command = Command::new(&java);
             hide_console_window(&mut java_command);
@@ -720,9 +739,7 @@ pub fn run() {
                 java_command.env("OPENDATALOADER_LOG_DIR", path);
             }
             let child = java_command
-                .args(java_args)
-                .arg("-jar")
-                .arg(&jar_path)
+                .args(&java_args)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn();
@@ -874,4 +891,46 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ktor_server_args, KTOR_JVM_ARGS};
+    use std::ffi::OsString;
+    use std::path::Path;
+
+    #[test]
+    fn ktor_jvm_args_preserve_pdfbox_module_access_contract() {
+        assert_eq!(
+            KTOR_JVM_ARGS,
+            [
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+                "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+                "--enable-native-access=ALL-UNNAMED",
+            ]
+        );
+    }
+
+    #[test]
+    fn ktor_server_args_put_jvm_options_before_jar_target() {
+        let jar_path = Path::new("/tmp/Open Data Loader/server.jar");
+
+        let args = ktor_server_args(jar_path);
+
+        let mut expected = KTOR_JVM_ARGS.iter().map(OsString::from).collect::<Vec<_>>();
+        expected.extend([OsString::from("-jar"), jar_path.as_os_str().to_owned()]);
+        assert_eq!(args, expected);
+    }
+
+    #[test]
+    fn ktor_server_args_preserve_unicode_jar_path_as_one_argument() {
+        let jar_path = Path::new("/tmp/한글 경로/server.jar");
+
+        let args = ktor_server_args(jar_path);
+
+        assert_eq!(args.len(), KTOR_JVM_ARGS.len() + 2);
+        assert_eq!(args[KTOR_JVM_ARGS.len()], OsString::from("-jar"));
+        assert_eq!(args.last(), Some(&jar_path.as_os_str().to_owned()));
+    }
 }
