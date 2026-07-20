@@ -11,7 +11,10 @@ import { mountPdfViewer, setConvertHandler, setCancelHandler, setConverting, set
 import { mountMarkdownRenderer, setMarkdown, setStreaming, clearMarkdown } from "./markdown-renderer";
 import { convertPdf, cancelConversion } from "./converter";
 import { mountProgressBar, updateProgress, hideProgress } from "./progress-bar";
-import { parseBBoxJson, toggleBBoxOverlay, getHiddenItems } from "./bbox-overlay";
+import { parseBBoxJson, toggleBBoxOverlay, getHiddenItems, setReadingOrderByPage, clearBBox } from "./bbox-overlay";
+import { createCanonicalDocument, type CanonicalDocument } from "./reading-order-model";
+import { setReadingOrderDocument } from "./reading-order-editor";
+import { initScrollSync } from "./scroll-sync";
 import { maybeShowOnboarding, showOnboarding } from "./onboarding";
 import { showSettings } from "./settings";
 import { initTheme } from "./theme";
@@ -222,6 +225,14 @@ function renderApp(root: HTMLDivElement): void {
   checkForUpdates();
   registerKeyboardShortcuts();
 
+  window.addEventListener("reading-order-changed", ((event: CustomEvent<CanonicalDocument>) => {
+    const document = event.detail;
+    setReadingOrderByPage(new Map([...document.pages].map(([page, order]) => [page, order.currentBlockIds])));
+    setMarkdown(document.serializeMarkdown());
+    initScrollSync();
+    window.dispatchEvent(new Event("markdown-output-changed"));
+  }) as EventListener);
+
   document.getElementById("pdf-mode-select")?.addEventListener("change", (e) => {
     setStatusMode((e.target as HTMLSelectElement).value);
   });
@@ -240,6 +251,9 @@ function renderApp(root: HTMLDivElement): void {
 
     setConverting(true);
     clearMarkdown();
+    setReadingOrderDocument(null);
+    clearBBox();
+    setBBoxAvailable(false);
     setStreaming(true);
 
     const mode = getSelectedMode() as Parameters<typeof convertPdf>[1];
@@ -253,7 +267,6 @@ function renderApp(root: HTMLDivElement): void {
       onComplete: async (markdown, jsonPath) => {
         hideProgress();
         setStreaming(false);
-        setMarkdown(markdown);
         setConverting(false);
         const pagesText = document.getElementById("pdf-pagecount")?.textContent ?? "";
         const totalPages = parseInt(pagesText, 10) || 0;
@@ -263,11 +276,22 @@ function renderApp(root: HTMLDivElement): void {
           try {
             const json = await readTextFile(jsonPath);
             parseBBoxJson(json);
+            const document = createCanonicalDocument(json, markdown);
+            setReadingOrderDocument(document);
+            setReadingOrderByPage(new Map([...document.pages].map(([page, order]) => [page, order.currentBlockIds])));
             setBBoxAvailable(true, () => toggleBBoxOverlay());
+            setMarkdown(document.serializeMarkdown());
+            initScrollSync();
             const hiddenCount = getHiddenItems().length;
             setStatusSafety(hiddenCount);
             updateSafetyPanel();
-          } catch { /* JSON 없어도 계속 */ }
+          } catch {
+            setReadingOrderDocument(null);
+            setMarkdown(markdown);
+          }
+        } else {
+          setReadingOrderDocument(null);
+          setMarkdown(markdown);
         }
       },
       onQualityWarning: (_warnings, emptyPages) => {

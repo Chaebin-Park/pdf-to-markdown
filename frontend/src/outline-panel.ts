@@ -3,8 +3,17 @@ import { getRawMarkdown, slugify } from "./markdown-renderer";
 interface Heading { depth: number; text: string; id: string; }
 
 let observer: IntersectionObserver | null = null;
+let mountedContainer: HTMLElement | null = null;
+let refreshBound = false;
 
 export function mountOutlinePanel(container: HTMLElement): void {
+  mountedContainer = container;
+  if (!refreshBound) {
+    refreshBound = true;
+    window.addEventListener("markdown-output-changed", () => {
+      if (mountedContainer?.isConnected) mountOutlinePanel(mountedContainer);
+    });
+  }
   observer?.disconnect();
   observer = null;
 

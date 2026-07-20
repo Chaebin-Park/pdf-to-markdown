@@ -101,6 +101,9 @@ export function mountMarkdownRenderer(container: HTMLElement): void {
 /** 현재 로드된 raw Markdown 텍스트를 반환한다. */
 export function getRawMarkdown(): string { return rawMarkdown; }
 
+/** Preview, Source, Copy, Save가 공통으로 읽는 현재 Markdown 출력 경계. */
+export function getCurrentMarkdownOutput(): string { return rawMarkdown; }
+
 /**
  * Markdown 텍스트를 설정하고 렌더링한다.
  * 스트리밍이 완료된 후 최종본을 확정할 때 사용한다.
@@ -157,7 +160,7 @@ function renderContent(): void {
   const sourcePane = document.getElementById(ID.sourcePane) as HTMLElement | null;
 
   if (viewMode !== "source" && previewPane) {
-    previewPane.innerHTML = marked.parse(rawMarkdown) as string;
+    previewPane.innerHTML = marked.parse(getCurrentMarkdownOutput()) as string;
     renderMathInElement(previewPane, {
       delimiters: [
         { left: "$$", right: "$$", display: true },
@@ -168,7 +171,7 @@ function renderContent(): void {
   }
 
   if (viewMode !== "preview" && sourcePane) {
-    sourcePane.innerHTML = `<pre class="md-raw">${escapeHtml(rawMarkdown)}</pre>`;
+    sourcePane.innerHTML = `<pre class="md-raw">${escapeHtml(getCurrentMarkdownOutput())}</pre>`;
   }
 }
 
@@ -186,8 +189,9 @@ function showPanel(): void {
 }
 
 function handleCopy(): void {
-  if (!rawMarkdown) return;
-  navigator.clipboard.writeText(rawMarkdown).then(() => {
+  const markdown = getCurrentMarkdownOutput();
+  if (!markdown) return;
+  navigator.clipboard.writeText(markdown).then(() => {
     const btn = document.getElementById(ID.copyBtn) as HTMLButtonElement | null;
     if (!btn) return;
     const orig = btn.textContent;
@@ -201,7 +205,8 @@ function handleCopy(): void {
 }
 
 async function handleSave(): Promise<void> {
-  if (!rawMarkdown) return;
+  const markdown = getCurrentMarkdownOutput();
+  if (!markdown) return;
   const btn = document.getElementById(ID.saveBtn) as HTMLButtonElement | null;
   if (!btn) return;
 
@@ -213,7 +218,7 @@ async function handleSave(): Promise<void> {
   btn.textContent = "Saving…";
 
   try {
-    const saved = await saveMarkdownFile(rawMarkdown, defaultName);
+    const saved = await saveMarkdownFile(markdown, defaultName);
     if (saved) {
       btn.textContent = "Saved!";
       setTimeout(() => {
