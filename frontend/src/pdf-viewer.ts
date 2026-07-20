@@ -12,6 +12,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { refreshBBoxOverlay, clearBBox, toggleOrderOverlay } from "./bbox-overlay";
+import { mountReadingOrderEditor, toggleReadingOrderPanel } from "./reading-order-editor";
 import { isDoclingReady, onDoclingReadyChange } from "./docling-state";
 import { openPdfFile } from "./tauri-bridge";
 import { DEFAULT_QUALITY_OPTIONS, type ConversionQualityOptions } from "./conversion-options";
@@ -240,6 +241,10 @@ export function mountPdfViewer(container: HTMLElement): void {
   registerQualityOptions();
   registerOpenDialog();
   initZoomControls();
+  mountReadingOrderEditor(container, {
+    onOrderChanged: (document) => window.dispatchEvent(new CustomEvent("reading-order-changed", { detail: document })),
+    onOrderVisibilityChanged: () => refreshBBoxOverlay(),
+  });
   renderRecentFiles();
 
   document.getElementById("pdf-convert-btn")?.addEventListener("click", () => {
@@ -315,8 +320,10 @@ export function setBBoxAvailable(available: boolean, onToggle?: () => void): voi
   }
   if (available && orderBtn) {
     orderBtn.onclick = () => {
-      orderBtn.classList.toggle("active");
-      toggleOrderOverlay();
+      const orderVisible = toggleOrderOverlay();
+      orderBtn.classList.toggle("active", orderVisible);
+      const panelVisible = toggleReadingOrderPanel();
+      orderBtn.setAttribute("aria-expanded", String(panelVisible));
     };
   }
 }
@@ -524,6 +531,7 @@ async function renderPage(page: PDFPageProxy, canvas: HTMLCanvasElement): Promis
 function jumpToPage(pageNum: number, pagesEl: HTMLElement): void {
   const wrapper = pagesEl.querySelector<HTMLElement>(`.pdf-page-wrapper[data-page="${pageNum}"]`);
   wrapper?.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.dispatchEvent(new CustomEvent("pdf-page-changed", { detail: pageNum }));
 }
 
 function setupPageNav(
@@ -539,7 +547,11 @@ function setupPageNav(
         .map((e) => Number((e.target as HTMLElement).dataset.page))
         .filter((n) => !isNaN(n));
       if (visible.length > 0) {
-        input.value = String(Math.min(...visible));
+        const current = Math.min(...visible);
+        if (input.value !== String(current)) {
+          input.value = String(current);
+          window.dispatchEvent(new CustomEvent("pdf-page-changed", { detail: current }));
+        }
       }
     },
     { root: pagesEl.parentElement, threshold: 0.3 },

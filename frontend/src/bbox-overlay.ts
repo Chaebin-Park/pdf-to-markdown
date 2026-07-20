@@ -38,6 +38,8 @@ export interface SafetyItem {
 }
 
 export interface BBoxItem {
+  id?: string;
+  sourcePath?: number[];
   type: string;
   pageNumber: number;
   bbox: [number, number, number, number]; // [leftX, bottomY, rightX, topY]
@@ -71,6 +73,7 @@ let items: BBoxItem[] = [];
 let hiddenItems: SafetyItem[] = [];
 let visible = false;
 let orderVisible = false;
+let orderByPage = new Map<number, string[]>();
 
 // ---------------------------------------------------------------------------
 // Floating tooltip
@@ -176,7 +179,7 @@ export function parseBBoxJson(json: string): void {
   hiddenItems = [];
   try {
     const doc = JSON.parse(json);
-    extractItems(doc.kids ?? []);
+    extractItems(doc.kids ?? [], []);
   } catch (e) {
     console.warn("bbox JSON 파싱 실패:", e);
   }
@@ -190,7 +193,22 @@ export function getHiddenItems(): SafetyItem[] {
 
 /** 파싱된 전체 bbox 항목 목록을 반환한다. */
 export function getBBoxItems(): BBoxItem[] {
-  return items;
+  const sourceIndex = new Map(items.map((item, index) => [item, index]));
+  return [...items].sort((a, b) => {
+    if (a.pageNumber !== b.pageNumber) return a.pageNumber - b.pageNumber;
+    const pageOrder = orderByPage.get(a.pageNumber) ?? [];
+    const aOrder = a.id ? pageOrder.indexOf(a.id) : -1;
+    const bOrder = b.id ? pageOrder.indexOf(b.id) : -1;
+    const aRank = aOrder >= 0 ? aOrder : pageOrder.length + (sourceIndex.get(a) ?? 0);
+    const bRank = bOrder >= 0 ? bOrder : pageOrder.length + (sourceIndex.get(b) ?? 0);
+    return aRank - bRank;
+  });
+}
+
+/** Canonical model의 현재 순서를 오버레이 번호에 반영한다. */
+export function setReadingOrderByPage(next: Map<number, string[]>): void {
+  orderByPage = new Map([...next].map(([page, ids]) => [page, [...ids]]));
+  if (orderVisible) renderOverlays();
 }
 
 /** 오버레이를 표시한다. */
@@ -226,6 +244,7 @@ export function refreshBBoxOverlay(): void {
 /** 모든 bbox 데이터와 오버레이를 초기화한다. */
 export function clearBBox(): void {
   items = [];
+  orderByPage.clear();
   visible = false;
   orderVisible = false;
   clearOverlays();
@@ -272,7 +291,12 @@ function renderOverlays(): void {
       `position:absolute;top:${canvas.offsetTop}px;left:${canvas.offsetLeft}px;` +
       `width:${canvasW}px;height:${canvasH}px;pointer-events:none;`;
 
-    let orderIdx = 0;
+    const originalTopLevel = pageItems.filter((item) => item.id && TOP_LEVEL_TYPES.has(item.type));
+    const preferredIds = orderByPage.get(pageNum);
+    const orderedTopLevel = preferredIds
+      ? preferredIds.map((id) => originalTopLevel.find((item) => item.id === id)).filter((item): item is BBoxItem => Boolean(item))
+      : originalTopLevel;
+    const orderIndex = new Map(orderedTopLevel.map((item, index) => [item.id, index + 1]));
     for (const item of pageItems) {
       const rectBounds = bboxToCanvasRect(item.bbox, transform, viewportW, viewportH, canvasW, canvasH);
       if (!rectBounds) continue;
@@ -296,12 +320,12 @@ function renderOverlays(): void {
         layer.appendChild(rect);
       }
 
-      if (orderVisible && TOP_LEVEL_TYPES.has(item.type)) {
-        orderIdx++;
+      const currentOrder = item.id ? orderIndex.get(item.id) : undefined;
+      if (orderVisible && currentOrder) {
         const chip = document.createElement("div");
         chip.className = "order-chip";
-        chip.textContent = String(orderIdx);
-        chip.title = `#${orderIdx} [${item.type}] ${item.content.slice(0, 80)}`;
+        chip.textContent = String(currentOrder);
+        chip.title = `읽기 순서 ${currentOrder}: ${item.type} · ${item.content.slice(0, 80)}`;
         chip.style.cssText = `position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;`;
         layer.appendChild(chip);
       }
@@ -319,10 +343,19 @@ function clearOverlays(): void {
 // JSON traversal (recursive)
 // ---------------------------------------------------------------------------
 
-function extractItems(elements: RawElement[]): void {
-  for (const el of elements) {
+function extractItems(elements: RawElement[], parentPath: number[]): void {
+  for (let index = 0; index < elements.length; index++) {
+    const el = elements[index];
+    const sourcePath = [...parentPath, index];
+    extractItem(el, sourcePath);
+  }
+}
+
+function extractItem(el: RawElement, sourcePath: number[]): void {
     if (el["bounding box"]) {
       items.push({
+        id: TOP_LEVEL_TYPES.has(el.type ?? "") ? `p${el["page number"] ?? 1}:${sourcePath.join(".")}` : undefined,
+        sourcePath,
         type: el.type ?? "unknown",
         pageNumber: el["page number"] ?? 1,
         bbox: el["bounding box"]!,
@@ -337,11 +370,13 @@ function extractItems(elements: RawElement[]): void {
         content: el.content ?? "",
       });
     }
-    if (el.kids) extractItems(el.kids);
-    if (el.rows) extractItems(el.rows);
-    if (el.cells) extractItems(el.cells);
-    if (el["list items"]) extractItems(el["list items"]);
-  }
+  const children = [
+    ...(el.kids ?? []),
+    ...(el.rows ?? []),
+    ...(el.cells ?? []),
+    ...(el["list items"] ?? []),
+  ];
+  extractItems(children, sourcePath);
 }
 
 function buildMeta(el: RawElement): string | undefined {
