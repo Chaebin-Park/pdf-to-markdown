@@ -200,17 +200,27 @@ export function mountPdfViewer(container: HTMLElement): void {
         <details class="quality-options">
           <summary>품질 설정</summary>
           <div class="quality-options-popover">
-            <label>읽기 순서
-              <select id="quality-reading-order">
-                <option value="AUTO">자동 (구조 트리 → XY-Cut)</option>
-                <option value="STRUCT_TREE">구조 트리만</option>
-                <option value="XY_CUT">XY-Cut만</option>
+            <label>문단 순서 판단
+              <select id="quality-reading-order" aria-describedby="quality-reading-order-guide">
+                <option value="AUTO">자동 선택 (권장)</option>
+                <option value="STRUCT_TREE">문서에 저장된 순서 우선</option>
+                <option value="XY_CUT">화면에 보이는 배치 우선</option>
               </select>
             </label>
+            <div class="quality-option-guide" id="quality-reading-order-guide">
+              <p><b>자동 선택</b> — 대부분의 PDF에 적합합니다. 문서 정보와 화면 배치를 함께 판단합니다.</p>
+              <p><b>문서에 저장된 순서 우선</b> — 접근성 태그가 잘 만들어진 전자문서에 적합합니다.</p>
+              <p><b>화면에 보이는 배치 우선</b> — 문단 순서가 뒤섞이거나 다단 편집된 논문에 사용하세요.</p>
+              <details>
+                <summary>기술 정보</summary>
+                PDF 구조 태그(Struct Tree)와 위치 기반 문단 분석(XY-Cut) 중 사용할 방식을 정합니다.
+              </details>
+            </div>
             <label><input id="quality-header-footer" type="checkbox"> 머리글·바닥글 포함</label>
             <label><input id="quality-line-breaks" type="checkbox"> 원본 줄바꿈 유지</label>
             <hr>
-            <span class="quality-filter-title">콘텐츠 보호 필터</span>
+            <span class="quality-filter-title">숨겨진 콘텐츠 처리</span>
+            <p class="quality-filter-help">일반적으로 기본값을 권장합니다. 본문이 누락될 때만 해당 항목을 조정하세요.</p>
             <label><input id="filter-hidden-text" type="checkbox"> 숨겨진 텍스트 제거</label>
             <label><input id="filter-out-of-page" type="checkbox" checked> 페이지 밖 텍스트 제거</label>
             <label><input id="filter-tiny-text" type="checkbox" checked> 극소 텍스트 제거</label>
