@@ -14,6 +14,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
@@ -62,6 +63,12 @@ object Converter {
             processor(request.filePath, config)
             coroutineContext.ensureActive()
             val artifacts = validateArtifacts(request.filePath, outputDir, startedAt)
+            val quality = ConversionQualityValidator.validate(
+                artifacts.markdown.toFile(),
+                artifacts.json.toFile(),
+                Instant.ofEpochMilli(startedAt.toMillis())
+            )
+            require(quality.isUsable) { quality.errors.joinToString("; ") }
             JobManager.sendProgress(jobId, ProgressEvent(step = 3, label = "완료", percent = 100))
             JobManager.markDone(
                 jobId,
@@ -69,7 +76,9 @@ object Converter {
                     jobId = jobId,
                     status = JobStatus.DONE.name,
                     markdownPath = artifacts.markdown.toString(),
-                    jsonPath = artifacts.json.toString()
+                    jsonPath = artifacts.json.toString(),
+                    qualityWarnings = quality.warnings,
+                    emptyPages = quality.emptyPages.toList()
                 )
             )
         } catch (e: CancellationException) {

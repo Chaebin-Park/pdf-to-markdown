@@ -42,6 +42,8 @@ export interface ConversionCallbacks {
   onComplete: (markdown: string, jsonPath: string | null) => void | Promise<void>;
   /** 오류 발생 */
   onError: (message: string, detail?: string | null) => void;
+  /** 결과는 생성됐지만 누락 가능성이 감지됨 */
+  onQualityWarning?: (warnings: string[], emptyPages: number[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +183,9 @@ export async function convertPdf(
   }
 
   await callbacks.onComplete(markdown, result.jsonPath ?? null);
+  if (result.qualityWarnings?.length) {
+    callbacks.onQualityWarning?.(result.qualityWarnings, result.emptyPages ?? []);
+  }
   activeJob = null;
   void fetch(`${base}/artifacts/${jobId}`, { method: "DELETE" });
 }

@@ -81,5 +81,7 @@ data class JobResult(
     val markdownPath: String? = null,
     val jsonPath: String? = null,
     val error: String? = null,
-    val errorDetail: String? = null
+    val errorDetail: String? = null,
+    val qualityWarnings: List<String> = emptyList(),
+    val emptyPages: List<Int> = emptyList()
 )

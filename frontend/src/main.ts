@@ -17,7 +17,7 @@ import { showSettings } from "./settings";
 import { initTheme } from "./theme";
 import { setDoclingReady } from "./docling-state";
 import { checkForUpdates } from "./updater";
-import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle, setStatusSafety, startJvmPolling } from "./status-bar";
+import { initStatusBar, setStatusMode, setStatusDone, setStatusIdle, setStatusSafety, setStatusQualityWarning, startJvmPolling } from "./status-bar";
 import { mountFilesPanel } from "./files-panel";
 import { mountOutlinePanel } from "./outline-panel";
 import { mountPagesPanel } from "./pages-panel";
@@ -269,6 +269,9 @@ function renderApp(root: HTMLDivElement): void {
             updateSafetyPanel();
           } catch { /* JSON 없어도 계속 */ }
         }
+      },
+      onQualityWarning: (_warnings, emptyPages) => {
+        setStatusQualityWarning(emptyPages);
       },
       onError: (message, detail) => {
         hideProgress();

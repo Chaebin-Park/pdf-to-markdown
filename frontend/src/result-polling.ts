@@ -12,6 +12,8 @@ export interface JobResult {
   jsonPath: string | null;
   error: string | null;
   errorDetail: string | null;
+  qualityWarnings?: string[];
+  emptyPages?: number[];
 }
 
 interface PollResponse {

@@ -43,6 +43,15 @@ export function setStatusDone(total: number, elapsedMs: number): void {
   }
 }
 
+export function setStatusQualityWarning(emptyPages: number[]): void {
+  const progress = document.getElementById("sb-progress");
+  if (!progress) return;
+  progress.style.display = "inline";
+  progress.textContent = emptyPages.length > 0
+    ? `⚠ 확인 필요: p.${emptyPages.join(", ")}`
+    : "⚠ 품질 확인 필요";
+}
+
 export function setStatusIdle(): void {
   const progress = document.getElementById("sb-progress");
   const avgtime  = document.getElementById("sb-avgtime");
