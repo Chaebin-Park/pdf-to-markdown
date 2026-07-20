@@ -40,6 +40,7 @@ fun Application.module() {
         anyHost()
         allowHeader(HttpHeaders.ContentType)
         allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Delete)
     }
     configureRouting()
 

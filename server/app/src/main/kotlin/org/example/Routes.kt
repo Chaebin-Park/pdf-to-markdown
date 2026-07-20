@@ -6,6 +6,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.example.models.ConvertRequest
@@ -35,10 +36,19 @@ fun Application.configureRouting() {
 
         post("/convert") {
             val request = call.receive<ConvertRequest>()
+            try {
+                request.validatedMode()
+                request.validatedReadingOrder()
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Invalid conversion options")))
+                return@post
+            }
             val jobId = JobManager.createJob()
 
             // 변환 작업을 별도 코루틴으로 실행하여 즉시 jobId 반환
-            launch { runConversion(jobId, request) }
+            val job = launch(start = CoroutineStart.LAZY) { runConversion(jobId, request) }
+            JobManager.attachJob(jobId, job)
+            job.start()
 
             call.respond(HttpStatusCode.Accepted, ConvertResponse(jobId = jobId))
         }
@@ -74,6 +84,22 @@ fun Application.configureRouting() {
                 ?: return@get call.respond(HttpStatusCode.NotFound, "result not found")
 
             call.respond(result)
+        }
+
+        delete("/jobs/{jobId}") {
+            val jobId = call.parameters["jobId"]
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, "jobId required")
+            if (!JobManager.cancelJob(jobId)) {
+                return@delete call.respond(HttpStatusCode.NotFound, "job not found")
+            }
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        delete("/artifacts/{jobId}") {
+            val jobId = call.parameters["jobId"]
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, "jobId required")
+            Converter.cleanup(jobId)
+            call.respond(HttpStatusCode.NoContent)
         }
     }
 }

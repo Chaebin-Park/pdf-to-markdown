@@ -11,7 +11,7 @@
  *   5. readTextFile()  — markdownPath 읽어 Markdown 문자열 반환
  */
 
-import { saveTempPdf, readTextFile } from "./tauri-bridge";
+import { saveTempPdf, readTextFile, startDoclingServe, type DoclingProfile } from "./tauri-bridge";
 import { inlineImages } from "./image-inliner";
 import { serverBaseUrl } from "./main";
 import {
@@ -39,7 +39,7 @@ export interface ConversionCallbacks {
   /** 진행률 업데이트 (0–100) */
   onProgress: (event: ProgressEvent) => void;
   /** 변환 완료 — Markdown 문자열 전달 */
-  onComplete: (markdown: string, jsonPath: string | null) => void;
+  onComplete: (markdown: string, jsonPath: string | null) => void | Promise<void>;
   /** 오류 발생 */
   onError: (message: string, detail?: string | null) => void;
 }
@@ -49,6 +49,8 @@ export interface ConversionCallbacks {
 // ---------------------------------------------------------------------------
 
 let activeEventSource: EventSource | null = null;
+let activeJob: { base: string; jobId: string } | null = null;
+let activeProgressResolve: (() => void) | null = null;
 let conversionCancelled = false;
 
 /** 진행 중인 변환을 취소한다. SSE 연결을 닫고 이후 단계를 건너뛴다. */
@@ -56,6 +58,12 @@ export function cancelConversion(): void {
   conversionCancelled = true;
   activeEventSource?.close();
   activeEventSource = null;
+  activeProgressResolve?.();
+  activeProgressResolve = null;
+  if (activeJob) {
+    void fetch(`${activeJob.base}/jobs/${activeJob.jobId}`, { method: "DELETE" });
+    activeJob = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +91,22 @@ export async function convertPdf(
     return;
   }
 
+  const profileByMode: Partial<Record<ConvertMode, DoclingProfile>> = {
+    HYBRID: "hybrid",
+    HYBRID_FULL: "hybrid",
+    OCR: "ocr",
+    FORMULA: "formula",
+  };
+  const profile = profileByMode[mode];
+  if (profile) {
+    try {
+      await startDoclingServe(profile);
+    } catch (e) {
+      callbacks.onError(`Hybrid ${profile} 프로필 시작 실패: ${e}`);
+      return;
+    }
+  }
+
   // 1. 임시 파일 저장
   let filePath: string;
   try {
@@ -106,6 +130,7 @@ export async function convertPdf(
     }
     const data: ConvertResponse = await res.json();
     jobId = data.jobId;
+    activeJob = { base, jobId };
   } catch (e) {
     callbacks.onError(`변환 요청 오류: ${e}`);
     return;
@@ -131,6 +156,7 @@ export async function convertPdf(
   if (conversionCancelled) return;
 
   if (result.status === "ERROR" || !result.markdownPath) {
+    activeJob = null;
     callbacks.onError(
       result.error ?? "알 수 없는 변환 오류가 발생했습니다.",
       result.errorDetail,
@@ -154,7 +180,9 @@ export async function convertPdf(
     console.warn("[converter] 이미지 인라인 처리 실패, 원본 마크다운 사용:", e);
   }
 
-  callbacks.onComplete(markdown, result.jsonPath ?? null);
+  await callbacks.onComplete(markdown, result.jsonPath ?? null);
+  activeJob = null;
+  void fetch(`${base}/artifacts/${jobId}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +199,7 @@ function listenProgress(
   onProgress: (e: ProgressEvent) => void,
 ): Promise<void> {
   return new Promise((resolve) => {
+    activeProgressResolve = resolve;
     const es = new EventSource(`${base}/progress/${jobId}`);
     activeEventSource = es;
 
@@ -187,6 +216,7 @@ function listenProgress(
       // 서버가 스트림을 닫거나 브라우저가 일시 오류를 감지하면 onerror가 발생한다.
       // 이후 /result 폴링에서 최종 DONE/ERROR 상태를 확인한다.
       es.close();
+      activeProgressResolve = null;
       resolve();
     };
   });

@@ -5,8 +5,10 @@ import kotlinx.serialization.Serializable
 /** PDF 변환 모드. */
 enum class ConvertMode { STANDARD, HYBRID, HYBRID_FULL, OCR, FORMULA }
 
+enum class ReadingOrderStrategy { AUTO, STRUCT_TREE, XY_CUT }
+
 /** 변환 작업의 실행 상태. */
-enum class JobStatus { PENDING, RUNNING, DONE, ERROR }
+enum class JobStatus { PENDING, RUNNING, DONE, ERROR, CANCELLED }
 
 /**
  * PDF 변환 요청 본문.
@@ -19,8 +21,22 @@ enum class JobStatus { PENDING, RUNNING, DONE, ERROR }
 data class ConvertRequest(
     val filePath: String,
     val mode: String = "STANDARD",
-    val outputDir: String? = null
-)
+    val outputDir: String? = null,
+    val readingOrder: String = "AUTO",
+    val includeHeaderFooter: Boolean = false,
+    val keepLineBreaks: Boolean = false,
+    val filterHiddenText: Boolean = false,
+    val filterOutOfPage: Boolean = true,
+    val filterTinyText: Boolean = true,
+    val filterHiddenOcg: Boolean = true
+) {
+    fun validatedMode(): ConvertMode = enumValueOrError(mode, "mode")
+    fun validatedReadingOrder(): ReadingOrderStrategy = enumValueOrError(readingOrder, "readingOrder")
+
+    private inline fun <reified T : Enum<T>> enumValueOrError(value: String, field: String): T =
+        enumValues<T>().firstOrNull { it.name == value }
+            ?: throw IllegalArgumentException("Unsupported $field: $value")
+}
 
 /**
  * 변환 요청 수락 응답.

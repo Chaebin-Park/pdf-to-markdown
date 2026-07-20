@@ -1,6 +1,7 @@
 package org.example
 
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Job
 import org.example.models.JobResult
 import org.example.models.JobStatus
 import org.example.models.ProgressEvent
@@ -23,6 +24,9 @@ object JobManager {
 
     /** 작업 완료 후 저장되는 최종 결과. */
     private val results = ConcurrentHashMap<String, JobResult>()
+
+    /** 실행 중인 변환 코루틴. 취소 요청을 실제 작업에 전달할 때 사용한다. */
+    private val jobs = ConcurrentHashMap<String, Job>()
 
     /**
      * 새 작업을 등록하고 고유 jobId를 반환한다.
@@ -47,6 +51,10 @@ object JobManager {
         statuses[jobId] = JobStatus.RUNNING
     }
 
+    fun attachJob(jobId: String, job: Job) {
+        jobs[jobId] = job
+    }
+
     /**
      * SSE 채널에 진행 상황 이벤트를 전송한다.
      *
@@ -68,9 +76,11 @@ object JobManager {
      * @param result 저장할 [JobResult]
      */
     fun markDone(jobId: String, result: JobResult) {
+        if (statuses[jobId] == JobStatus.CANCELLED) return
         statuses[jobId] = JobStatus.DONE
         results[jobId] = result
         channels[jobId]?.close()
+        jobs.remove(jobId)
     }
 
     /**
@@ -81,6 +91,7 @@ object JobManager {
      * @param errorDetail 클라이언트에 전달할 짧은 오류 상세. 전체 스택 트레이스는 파일 로그에 기록한다.
      */
     fun markError(jobId: String, errorMessage: String, errorDetail: String? = null) {
+        if (statuses[jobId] == JobStatus.CANCELLED) return
         statuses[jobId] = JobStatus.ERROR
         results[jobId] = JobResult(
             jobId = jobId,
@@ -89,6 +100,23 @@ object JobManager {
             errorDetail = errorDetail
         )
         channels[jobId]?.close()
+        jobs.remove(jobId)
+    }
+
+    fun cancelJob(jobId: String): Boolean {
+        val status = statuses[jobId] ?: return false
+        if (status == JobStatus.DONE || status == JobStatus.ERROR || status == JobStatus.CANCELLED) {
+            return true
+        }
+        statuses[jobId] = JobStatus.CANCELLED
+        results[jobId] = JobResult(
+            jobId = jobId,
+            status = JobStatus.CANCELLED.name,
+            error = "변환이 취소되었습니다."
+        )
+        channels[jobId]?.close()
+        jobs.remove(jobId)?.cancel()
+        return true
     }
 
     /**

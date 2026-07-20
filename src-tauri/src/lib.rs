@@ -1,9 +1,10 @@
 use std::ffi::OsString;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use std::{sync::mpsc, thread};
 
@@ -39,6 +40,7 @@ struct ServerState {
 const SERVER_PORT_TIMEOUT_SECS: u64 = 60;
 const SERVER_TCP_TIMEOUT_SECS: u64 = 30;
 const SERVER_PROCESS_POLL_MS: u64 = 500;
+static TEMP_INPUT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// PDFBox가 사용하는 JVM 내부 API와 네이티브 접근을 허용하는 Ktor 서버 실행 인자.
 ///
@@ -66,12 +68,65 @@ fn ktor_server_args(jar_path: &Path) -> Vec<OsString> {
 struct DoclingState {
     /// docling-serve가 수신 중인 포트. 기동 완료 전에는 `None`.
     port: Mutex<Option<u16>>,
+    profile: Mutex<Option<DoclingProfile>>,
+    error: Mutex<Option<String>>,
 }
 
 /// docling-serve 프로세스 핸들을 Tauri 상태로 공유하기 위한 래퍼.
 ///
 /// [start_docling_serve] command와 [tauri::RunEvent::Exit] 핸들러 양쪽에서 접근한다.
 struct DoclingHandle(Arc<Mutex<Option<Child>>>);
+
+const HYBRID_PACKAGE_VERSION: &str = "2.4.3";
+const HYBRID_PACKAGE_SPEC: &str = "opendataloader-pdf[hybrid]==2.4.3";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+enum DoclingProfile {
+    Hybrid,
+    Ocr,
+    Formula,
+}
+
+impl DoclingProfile {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Hybrid => "hybrid",
+            Self::Ocr => "ocr",
+            Self::Formula => "formula",
+        }
+    }
+}
+
+fn docling_server_args(profile: DoclingProfile, port: u16) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("--host"),
+        OsString::from("127.0.0.1"),
+        OsString::from("--port"),
+        OsString::from(port.to_string()),
+    ];
+    match profile {
+        DoclingProfile::Hybrid => {}
+        DoclingProfile::Ocr => args.extend([
+            OsString::from("--force-ocr"),
+            OsString::from("--ocr-lang"),
+            OsString::from("ko,en"),
+        ]),
+        DoclingProfile::Formula => args.push(OsString::from("--enrich-formula")),
+    }
+    args
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HybridDiagnostics {
+    installed: bool,
+    expected_version: &'static str,
+    installed_version: Option<String>,
+    running_profile: Option<String>,
+    port: Option<u16>,
+    error: Option<String>,
+}
 
 /// WebView에서 Ktor 서버 포트를 조회하는 Tauri command.
 ///
@@ -119,8 +174,64 @@ fn stderr_tail(stderr_summary: &Arc<Mutex<Vec<String>>>) -> String {
 fn check_hybrid_installed(app: tauri::AppHandle) -> bool {
     app.path()
         .cache_dir()
-        .map(|dir| dir.join("opendataloader").join(".hybrid_installed").exists())
-        .unwrap_or(false)
+        .ok()
+        .and_then(|dir| {
+            std::fs::read_to_string(dir.join("opendataloader").join(".hybrid_installed")).ok()
+        })
+        .is_some_and(|version| hybrid_marker_is_compatible(&version))
+}
+
+fn hybrid_marker_is_compatible(marker: &str) -> bool {
+    marker.trim() == HYBRID_PACKAGE_VERSION
+}
+
+fn hybrid_python_path(cache_dir: &Path) -> std::path::PathBuf {
+    #[cfg(target_os = "windows")]
+    return cache_dir.join("venv").join("Scripts").join("python.exe");
+    #[cfg(not(target_os = "windows"))]
+    return cache_dir.join("venv").join("bin").join("python");
+}
+
+fn installed_hybrid_version(cache_dir: &Path) -> Option<String> {
+    let mut command = Command::new(hybrid_python_path(cache_dir));
+    hide_console_window(&mut command);
+    let output = command
+        .args([
+            "-c",
+            "import importlib.metadata; print(importlib.metadata.version('opendataloader-pdf'))",
+        ])
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+#[tauri::command]
+fn get_hybrid_diagnostics(
+    app: tauri::AppHandle,
+    state: tauri::State<DoclingState>,
+) -> HybridDiagnostics {
+    let installed_version = app
+        .path()
+        .cache_dir()
+        .ok()
+        .map(|dir| dir.join("opendataloader"))
+        .as_deref()
+        .and_then(installed_hybrid_version);
+    HybridDiagnostics {
+        installed: installed_version.as_deref() == Some(HYBRID_PACKAGE_VERSION),
+        expected_version: HYBRID_PACKAGE_VERSION,
+        installed_version,
+        running_profile: state
+            .profile
+            .lock()
+            .unwrap()
+            .map(|profile| profile.as_str().to_string()),
+        port: *state.port.lock().unwrap(),
+        error: state.error.lock().unwrap().clone(),
+    }
 }
 
 /// 번들된 uv 바이너리의 경로를 반환하는 헬퍼.
@@ -327,7 +438,7 @@ struct InstallProgress {
 /// 순서:
 /// 1. `uv python install 3.11` — Python 3.11 설치
 /// 2. `uv venv <cache>/venv --python 3.11` — 가상 환경 생성
-/// 3. `uv pip install --python <cache>/venv "opendataloader-pdf[hybrid]"` — 패키지 설치
+/// 3. 호환되는 고정 `opendataloader-pdf[hybrid]` 버전 설치
 ///
 /// 각 단계 전후로 `hybrid-install-progress` 이벤트를 emit한다.
 /// 패키지 설치 중 출력 라인은 `hybrid-install-log` 이벤트로 실시간 전달된다.
@@ -392,7 +503,7 @@ async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
             "install",
             "--python",
             venv_dir.to_str().unwrap(),
-            "opendataloader-pdf[hybrid]",
+            HYBRID_PACKAGE_SPEC,
         ])
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -414,8 +525,15 @@ async fn install_hybrid(app: tauri::AppHandle) -> Result<(), String> {
     }
     emit(3, "패키지 설치 완료", 95);
 
-    // 설치 완료 플래그 파일 생성
-    std::fs::write(cache_dir.join(".hybrid_installed"), "")
+    let installed_version = installed_hybrid_version(&cache_dir)
+        .ok_or_else(|| "설치된 opendataloader-pdf 버전을 확인할 수 없습니다.".to_string())?;
+    if installed_version != HYBRID_PACKAGE_VERSION {
+        return Err(format!(
+            "Hybrid 런타임 버전 불일치: 예상 {HYBRID_PACKAGE_VERSION}, 설치 {installed_version}"
+        ));
+    }
+
+    std::fs::write(cache_dir.join(".hybrid_installed"), HYBRID_PACKAGE_VERSION)
         .map_err(|e| format!("플래그 파일 생성 실패: {e}"))?;
     emit(3, "하이브리드 모드 활성화 완료", 100);
 
@@ -440,6 +558,8 @@ fn uninstall_hybrid(
         *guard = None;
     }
     *docling_state.port.lock().unwrap() = None;
+    *docling_state.profile.lock().unwrap() = None;
+    *docling_state.error.lock().unwrap() = None;
 
     let cache_dir = app
         .path()
@@ -496,6 +616,35 @@ fn wait_for_server(port: u16, timeout_secs: u64) -> bool {
     false
 }
 
+fn probe_docling_health(port: u16) -> bool {
+    let address = format!("127.0.0.1:{port}");
+    let Ok(mut stream) = TcpStream::connect_timeout(
+        &address.parse().expect("invalid address"),
+        Duration::from_secs(1),
+    ) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    if stream
+        .write_all(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .is_err()
+    {
+        return false;
+    }
+    let mut response = String::new();
+    stream.read_to_string(&mut response).is_ok()
+        && response.starts_with("HTTP/1.1 200")
+        && response.contains("\"status\":\"ok\"")
+}
+
+fn pipe_docling_logs<R: Read + Send + 'static>(reader: R, stream_name: &'static str) {
+    thread::spawn(move || {
+        for line in BufReader::new(reader).lines().map_while(Result::ok) {
+            log::info!("[docling:{stream_name}] {line}");
+        }
+    });
+}
+
 /// docling-serve 프로세스를 시작하는 Tauri command.
 ///
 /// `<cache>/venv/bin/docling-serve run --host 127.0.0.1 --port 5002` 를 실행한다.
@@ -506,9 +655,13 @@ fn start_docling_serve(
     app: tauri::AppHandle,
     handle_state: tauri::State<'_, DoclingHandle>,
     docling_state: tauri::State<'_, DoclingState>,
+    profile: Option<DoclingProfile>,
 ) -> Result<(), String> {
-    // 이미 실행 중이면 no-op
-    if docling_state.port.lock().unwrap().is_some() {
+    let requested_profile = profile.unwrap_or(DoclingProfile::Hybrid);
+    if *docling_state.profile.lock().unwrap() == Some(requested_profile)
+        && docling_state.port.lock().unwrap().is_some()
+        && probe_docling_health(DOCLING_PORT)
+    {
         return Ok(());
     }
 
@@ -530,38 +683,70 @@ fn start_docling_serve(
         );
     }
 
-    // 앱 강제 종료 후 좀비 프로세스가 포트를 점유하고 있을 수 있음.
-    // 포트가 이미 열려있으면 기존 프로세스를 재활용하고 새 프로세스를 시작하지 않는다.
-    if wait_for_server(DOCLING_PORT, 2) {
-        *docling_state.port.lock().unwrap() = Some(DOCLING_PORT);
-        let _ = app.emit("docling-ready", DOCLING_PORT);
-        log::info!("docling-serve already running on port {DOCLING_PORT}, reusing");
-        return Ok(());
+    let installed_version = installed_hybrid_version(&cache_dir)
+        .ok_or_else(|| "Hybrid 런타임 버전을 확인할 수 없습니다. 다시 설치해 주세요.".to_string())?;
+    if installed_version != HYBRID_PACKAGE_VERSION {
+        return Err(format!(
+            "호환되지 않는 Hybrid 런타임입니다 (예상 {HYBRID_PACKAGE_VERSION}, 설치 {installed_version}). 다시 설치해 주세요."
+        ));
     }
 
-    let child = Command::new(&docling_bin)
-        .args(["--host", "127.0.0.1", "--port", &DOCLING_PORT.to_string()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+    if let Ok(mut guard) = handle_state.0.lock() {
+        if let Some(child) = guard.as_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        *guard = None;
+    }
+    *docling_state.port.lock().unwrap() = None;
+    *docling_state.profile.lock().unwrap() = None;
+
+    // upstream /health는 version/profile을 반환하지 않으므로 외부 서비스는 재사용하지 않는다.
+    if wait_for_server(DOCLING_PORT, 2) {
+        let message = format!(
+            "포트 {DOCLING_PORT}의 기존 Hybrid 서비스는 버전/프로필 호환성을 확인할 수 없습니다. 프로세스를 종료한 뒤 다시 시도해 주세요."
+        );
+        *docling_state.error.lock().unwrap() = Some(message.clone());
+        return Err(message);
+    }
+
+    let mut command = Command::new(&docling_bin);
+    hide_console_window(&mut command);
+    let mut child = command
+        .args(docling_server_args(requested_profile, DOCLING_PORT))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("docling-serve 시작 실패: {e}"))?;
 
+    if let Some(stdout) = child.stdout.take() {
+        pipe_docling_logs(stdout, "stdout");
+    }
+    if let Some(stderr) = child.stderr.take() {
+        pipe_docling_logs(stderr, "stderr");
+    }
+
     *handle_state.0.lock().unwrap() = Some(child);
-
-    // 백그라운드 스레드에서 TCP health check 후 상태 갱신 및 이벤트 emit
-    let app_handle = app.clone();
-    thread::spawn(move || {
-        if wait_for_server(DOCLING_PORT, 60) {
-            let state = app_handle.state::<DoclingState>();
-            *state.port.lock().unwrap() = Some(DOCLING_PORT);
-            let _ = app_handle.emit("docling-ready", DOCLING_PORT);
-            log::info!("docling-serve ready on port {DOCLING_PORT}");
-        } else {
-            log::error!("docling-serve did not become ready in time");
-        }
-    });
-
-    Ok(())
+    if wait_for_server(DOCLING_PORT, 60) && probe_docling_health(DOCLING_PORT) {
+        *docling_state.port.lock().unwrap() = Some(DOCLING_PORT);
+        *docling_state.profile.lock().unwrap() = Some(requested_profile);
+        *docling_state.error.lock().unwrap() = None;
+        let _ = app.emit("docling-ready", DOCLING_PORT);
+        log::info!(
+            "docling-serve ready: version={}, profile={}, port={DOCLING_PORT}",
+            HYBRID_PACKAGE_VERSION,
+            requested_profile.as_str()
+        );
+        Ok(())
+    } else {
+        let message = format!(
+            "docling-serve 시작 타임아웃: version={}, profile={}",
+            HYBRID_PACKAGE_VERSION,
+            requested_profile.as_str()
+        );
+        *docling_state.error.lock().unwrap() = Some(message.clone());
+        Err(message)
+    }
 }
 
 /// WebView에서 docling-serve 포트를 조회하는 Tauri command.
@@ -582,11 +767,41 @@ fn save_temp_pdf(app: tauri::AppHandle, data: Vec<u8>) -> Result<String, String>
         .path()
         .temp_dir()
         .map_err(|e| format!("임시 디렉터리 조회 실패: {e}"))?;
-    let path = tmp_dir.join("opendataloader_input.pdf");
-    std::fs::write(&path, &data).map_err(|e| format!("PDF 임시 저장 실패: {e}"))?;
+    let path = write_unique_temp_pdf(&tmp_dir, &data)?;
     path.to_str()
         .map(|s| s.to_string())
         .ok_or_else(|| "파일 경로 변환 실패".to_string())
+}
+
+fn write_unique_temp_pdf(tmp_dir: &Path, data: &[u8]) -> Result<std::path::PathBuf, String> {
+    let root = tmp_dir.join("opendataloader-inputs");
+    std::fs::create_dir_all(&root).map_err(|e| format!("임시 입력 루트 생성 실패: {e}"))?;
+    for _ in 0..32 {
+        let sequence = TEMP_INPUT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let unique = format!(
+            "{}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+            sequence
+        );
+        let job_dir = root.join(unique);
+        match std::fs::create_dir(&job_dir) {
+            Ok(()) => {
+                let path = job_dir.join("input.pdf");
+                if let Err(error) = std::fs::write(&path, data) {
+                    let _ = std::fs::remove_dir(&job_dir);
+                    return Err(format!("PDF 임시 저장 실패: {error}"));
+                }
+                return Ok(path);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(format!("임시 입력 디렉터리 생성 실패: {error}")),
+        }
+    }
+    Err("고유 임시 입력 경로 생성 실패".to_string())
 }
 
 /// 지정 경로의 텍스트 파일을 읽어 문자열로 반환한다.
@@ -659,6 +874,8 @@ pub fn run() {
         })
         .manage(DoclingState {
             port: Mutex::new(None),
+            profile: Mutex::new(None),
+            error: Mutex::new(None),
         })
         .manage(DoclingHandle(docling_handle))
         .setup(move |app| {
@@ -862,6 +1079,7 @@ pub fn run() {
             get_server_port,
             get_server_error,
             check_hybrid_installed,
+            get_hybrid_diagnostics,
             install_hybrid,
             uninstall_hybrid,
             start_docling_serve,
@@ -895,9 +1113,14 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{ktor_server_args, KTOR_JVM_ARGS};
+    use super::{
+        docling_server_args, hybrid_marker_is_compatible, ktor_server_args,
+        write_unique_temp_pdf, DoclingProfile, HYBRID_PACKAGE_SPEC, KTOR_JVM_ARGS,
+        TEMP_INPUT_SEQUENCE,
+    };
     use std::ffi::OsString;
     use std::path::Path;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn ktor_jvm_args_preserve_pdfbox_module_access_contract() {
@@ -932,5 +1155,71 @@ mod tests {
         assert_eq!(args.len(), KTOR_JVM_ARGS.len() + 2);
         assert_eq!(args[KTOR_JVM_ARGS.len()], OsString::from("-jar"));
         assert_eq!(args.last(), Some(&jar_path.as_os_str().to_owned()));
+    }
+
+    #[test]
+    fn hybrid_dependency_is_pinned_to_core_compatible_version() {
+        assert_eq!(HYBRID_PACKAGE_SPEC, "opendataloader-pdf[hybrid]==2.4.3");
+    }
+
+    #[test]
+    fn hybrid_install_marker_rejects_legacy_and_incompatible_versions() {
+        assert!(hybrid_marker_is_compatible("2.4.3\n"));
+        assert!(!hybrid_marker_is_compatible(""));
+        assert!(!hybrid_marker_is_compatible("2.4.4"));
+    }
+
+    #[test]
+    fn docling_hybrid_profile_has_no_enrichment_flags() {
+        let args = docling_server_args(DoclingProfile::Hybrid, 5002);
+        assert_eq!(
+            args,
+            ["--host", "127.0.0.1", "--port", "5002"].map(OsString::from)
+        );
+    }
+
+    #[test]
+    fn docling_ocr_profile_forces_korean_and_english_ocr() {
+        let args = docling_server_args(DoclingProfile::Ocr, 5002);
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--ocr-lang", "ko,en"].map(OsString::from)));
+        assert!(args.contains(&OsString::from("--force-ocr")));
+        assert!(!args.contains(&OsString::from("--enrich-formula")));
+    }
+
+    #[test]
+    fn docling_formula_profile_enables_formula_only() {
+        let args = docling_server_args(DoclingProfile::Formula, 5002);
+        assert!(args.contains(&OsString::from("--enrich-formula")));
+        assert!(!args.contains(&OsString::from("--force-ocr")));
+    }
+
+    #[test]
+    fn concurrent_temp_inputs_use_isolated_directories() {
+        let root = std::env::temp_dir().join(format!(
+            "opendataloader-rust-test-{}-{}",
+            std::process::id(),
+            TEMP_INPUT_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let handles = (0..8)
+            .map(|index| {
+                let root = root.clone();
+                std::thread::spawn(move || {
+                    write_unique_temp_pdf(&root, format!("pdf-{index}").as_bytes()).unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let paths = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<std::collections::HashSet<_>>();
+
+        assert_eq!(paths.len(), 8);
+        assert!(paths.iter().all(|path| path.file_name().unwrap() == "input.pdf"));
+        assert!(paths.iter().all(|path| std::fs::metadata(path).unwrap().len() > 0));
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

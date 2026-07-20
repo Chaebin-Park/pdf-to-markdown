@@ -250,7 +250,7 @@ function renderApp(root: HTMLDivElement): void {
       onProgress: (event) => {
         updateProgress({ percent: event.percent, label: event.label, eta: event.eta });
       },
-      onComplete: (markdown, jsonPath) => {
+      onComplete: async (markdown, jsonPath) => {
         hideProgress();
         setStreaming(false);
         setMarkdown(markdown);
@@ -260,13 +260,14 @@ function renderApp(root: HTMLDivElement): void {
         setStatusDone(totalPages, Date.now() - conversionStartTime);
         // bbox JSON이 있으면 파싱 후 토글 버튼 활성화 + safety 패널 갱신
         if (jsonPath) {
-          readTextFile(jsonPath).then((json) => {
+          try {
+            const json = await readTextFile(jsonPath);
             parseBBoxJson(json);
             setBBoxAvailable(true, () => toggleBBoxOverlay());
             const hiddenCount = getHiddenItems().length;
             setStatusSafety(hiddenCount);
             updateSafetyPanel();
-          }).catch(() => { /* JSON 없어도 계속 */ });
+          } catch { /* JSON 없어도 계속 */ }
         }
       },
       onError: (message, detail) => {
