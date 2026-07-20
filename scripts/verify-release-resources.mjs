@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { verifyReleaseMetadata } from "./lib/release-metadata.mjs";
 
 const args = new Set(process.argv.slice(2));
 const platformArg = process.argv.find((arg) => arg.startsWith("--platform="));
@@ -159,6 +160,16 @@ if (!platform || !expectations[platform]) {
   process.exit();
 }
 
+let metadataResult;
+try {
+  metadataResult = verifyReleaseMetadata(repoRoot);
+  for (const error of metadataResult.errors) {
+    fail(error);
+  }
+} catch (error) {
+  fail(`release metadata verification failed: ${error.message}`);
+}
+
 const expected = expectations[platform];
 const config = readJson(expected.config);
 const resources = config.bundle?.resources;
@@ -209,5 +220,5 @@ if (process.exitCode) {
 }
 
 console.log(
-  `release resource verification passed (${platform}${configOnly ? ", config-only" : ""})`
+  `release verification passed (v${metadataResult.expectedVersion}, ${platform}${configOnly ? ", config-only" : ""})`
 );

@@ -2,6 +2,17 @@
 
 ## Resource Gate
 
+`release-version.json` is the single expected release version. The verifier checks
+that it matches `tauri.conf.json`, `Cargo.toml`, and `latest.json`, and that updater
+metadata contains signed `darwin-aarch64` and `windows-x86_64` artifacts under the
+matching GitHub release tag.
+
+Run the dependency-free metadata tests:
+
+```sh
+node --test tests/release-metadata.test.mjs
+```
+
 Run the release resource verifier before platform builds:
 
 ```sh

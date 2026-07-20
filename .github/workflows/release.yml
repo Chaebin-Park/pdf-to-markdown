@@ -138,6 +138,9 @@ jobs:
           rm -rf src-tauri/resources/jre
           echo "jre.zip 크기: $(du -sh src-tauri/resources/jre.zip | cut -f1)"
 
+      - name: Test release metadata verifier
+        run: node --test tests/release-metadata.test.mjs
+
       - name: Verify release resources (macOS)
         run: node scripts/verify-release-resources.mjs --platform=macos
 
@@ -264,6 +267,10 @@ jobs:
           powershell -Command "Compress-Archive -Path 'src-tauri\\resources\\jre' -DestinationPath 'src-tauri\\resources\\jre.zip' -Force"
           rm -rf src-tauri/resources/jre
           echo "jre.zip 크기: $(du -sh src-tauri/resources/jre.zip | cut -f1)"
+
+      - name: Test release metadata verifier
+        shell: bash
+        run: node --test tests/release-metadata.test.mjs
 
       - name: Verify release resources (Windows)
         shell: bash
