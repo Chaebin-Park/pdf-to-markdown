@@ -1,9 +1,9 @@
-# Release Metadata Verification — v0.9.0-rc.1
+# Release Metadata Verification — v0.9.0-rc.2
 
 ## Scope
 
 - Treat `release-version.json` as the build version and channel source of truth.
-- Verify Tauri and Cargo versions match `0.9.0-rc.1`.
+- Verify Tauri and Cargo versions match `0.9.0-rc.2`.
 - Keep the stable updater metadata on `0.8.7` while the RC is a prerelease.
 - Require signed updater entries for `darwin-aarch64` and `windows-x86_64`.
 - Require both updater URLs to point at the expected `v0.8.7` GitHub release artifacts.
@@ -11,7 +11,7 @@
 
 ## Acceptance Criteria
 
-- A valid v0.9.0-rc.1 fixture with stable updater v0.8.7 passes.
+- A valid v0.9.0-rc.2 fixture with stable updater v0.8.7 passes.
 - A prerelease version declared on the stable channel fails.
 - A stale application version and a missing Windows updater entry fail.
 - An unexpected macOS updater URL fails.

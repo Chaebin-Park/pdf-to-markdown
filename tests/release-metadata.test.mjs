@@ -11,12 +11,12 @@ function makeFixture(mutator = () => {}) {
   fs.mkdirSync(path.join(root, "src-tauri"));
   const fixture = {
     expected: {
-      version: "0.9.0-rc.1",
+      version: "0.9.0-rc.2",
       channel: "prerelease",
       stableUpdaterVersion: "0.8.7",
     },
-    tauri: { version: "0.9.0-rc.1" },
-    cargo: '[package]\nname = "app"\nversion = "0.9.0-rc.1"\n\n[dependencies]\n',
+    tauri: { version: "0.9.0-rc.2" },
+    cargo: '[package]\nname = "app"\nversion = "0.9.0-rc.2"\n\n[dependencies]\n',
     updater: {
       version: "0.8.7",
       platforms: {
@@ -39,11 +39,11 @@ function makeFixture(mutator = () => {}) {
   return root;
 }
 
-test("accepts v0.9.0-rc.1 while keeping v0.8.7 on the stable updater channel", (t) => {
+test("accepts v0.9.0-rc.2 while keeping v0.8.7 on the stable updater channel", (t) => {
   const root = makeFixture();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   assert.deepEqual(verifyReleaseMetadata(root), {
-    expectedVersion: "0.9.0-rc.1",
+    expectedVersion: "0.9.0-rc.2",
     stableUpdaterVersion: "0.8.7",
     channel: "prerelease",
     errors: [],
