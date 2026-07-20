@@ -10,9 +10,13 @@ function makeFixture(mutator = () => {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-metadata-"));
   fs.mkdirSync(path.join(root, "src-tauri"));
   const fixture = {
-    expected: { version: "0.8.7" },
-    tauri: { version: "0.8.7" },
-    cargo: '[package]\nname = "app"\nversion = "0.8.7"\n\n[dependencies]\n',
+    expected: {
+      version: "0.9.0-rc.1",
+      channel: "prerelease",
+      stableUpdaterVersion: "0.8.7",
+    },
+    tauri: { version: "0.9.0-rc.1" },
+    cargo: '[package]\nname = "app"\nversion = "0.9.0-rc.1"\n\n[dependencies]\n',
     updater: {
       version: "0.8.7",
       platforms: {
@@ -35,10 +39,15 @@ function makeFixture(mutator = () => {}) {
   return root;
 }
 
-test("accepts aligned v0.8.7 metadata for macOS and Windows", (t) => {
+test("accepts v0.9.0-rc.1 while keeping v0.8.7 on the stable updater channel", (t) => {
   const root = makeFixture();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  assert.deepEqual(verifyReleaseMetadata(root), { expectedVersion: "0.8.7", errors: [] });
+  assert.deepEqual(verifyReleaseMetadata(root), {
+    expectedVersion: "0.9.0-rc.1",
+    stableUpdaterVersion: "0.8.7",
+    channel: "prerelease",
+    errors: [],
+  });
 });
 
 test("rejects a stale version and missing Windows updater entry", (t) => {
@@ -52,7 +61,7 @@ test("rejects a stale version and missing Windows updater entry", (t) => {
   assert.ok(errors.some((error) => error.includes("missing updater platform windows-x86_64")));
 });
 
-test("rejects an updater URL outside the expected v0.8.7 release", (t) => {
+test("rejects an updater URL outside the stable v0.8.7 release", (t) => {
   const root = makeFixture((fixture) => {
     fixture.updater.platforms["darwin-aarch64"].url =
       "https://example.invalid/v0.8.7/pdf-to-markdown.app.tar.gz";
@@ -60,4 +69,13 @@ test("rejects an updater URL outside the expected v0.8.7 release", (t) => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const { errors } = verifyReleaseMetadata(root);
   assert.ok(errors.some((error) => error.includes("darwin-aarch64 URL must be")));
+});
+
+test("rejects a prerelease version declared on the stable channel", (t) => {
+  const root = makeFixture((fixture) => {
+    fixture.expected.channel = "stable";
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { errors } = verifyReleaseMetadata(root);
+  assert.ok(errors.some((error) => error.includes("stable channel cannot use")));
 });

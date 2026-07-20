@@ -14,7 +14,9 @@ Turn the code-verifiable parts of the large-PDF Hybrid/OCR/Formula follow-up int
 | Rust JVM bootstrap contract | Required PDFBox module/native-access flags are fixed; JVM options precede `-jar`; Unicode/space paths remain one argument; no real JVM is spawned by tests | `cargo test` — 3 passed; `cargo check` passed; `docs/qa/qa-v09-003-rust-jvm-bootstrap.md` | `954c30d` |
 | Release metadata and resources | Tauri, Cargo, lockfile, updater metadata, platform entries, and artifact URLs agree on `0.8.7`; stale/missing metadata fails; macOS/Windows config checks pass | Node tests — 3 passed; both config-only checks passed; `docs/qa/release-metadata-verification.md` | `a204a06` |
 
-The release version baseline was aligned before the parallel bundles in commit `425aa1c`.
+The stable release metadata baseline was aligned in commit `425aa1c`. The subsequent
+release candidate sets the build version to `0.9.0-rc.1` while intentionally keeping
+the automatic-update stable channel on `0.8.7`.
 
 ## Integrated verification
 

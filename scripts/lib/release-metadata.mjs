@@ -22,23 +22,42 @@ function readCargoVersion(repoRoot) {
 
 export function verifyReleaseMetadata(repoRoot) {
   const errors = [];
-  const expectedVersion = readJson(repoRoot, "release-version.json").version;
+  const release = readJson(repoRoot, "release-version.json");
+  const expectedVersion = release.version;
+  const stableUpdaterVersion = release.stableUpdaterVersion ?? expectedVersion;
   const tauriVersion = readJson(repoRoot, "src-tauri/tauri.conf.json").version;
   const cargoVersion = readCargoVersion(repoRoot);
   const updater = readJson(repoRoot, "latest.json");
 
-  if (typeof expectedVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(expectedVersion)) {
+  if (typeof expectedVersion !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(expectedVersion)) {
     errors.push("release-version.json must contain a semantic version string");
+  }
+
+  if (!["stable", "prerelease"].includes(release.channel)) {
+    errors.push("release-version.json channel must be stable or prerelease");
+  }
+
+  if (release.channel === "prerelease" && !expectedVersion.includes("-")) {
+    errors.push("prerelease channel requires a prerelease semantic version");
+  }
+
+  if (release.channel === "stable" && expectedVersion.includes("-")) {
+    errors.push("stable channel cannot use a prerelease semantic version");
   }
 
   for (const [source, actual] of [
     ["src-tauri/tauri.conf.json", tauriVersion],
     ["src-tauri/Cargo.toml", cargoVersion],
-    ["latest.json", updater.version],
   ]) {
     if (actual !== expectedVersion) {
       errors.push(`${source} version ${actual ?? "<missing>"} does not match ${expectedVersion}`);
     }
+  }
+
+  if (updater.version !== stableUpdaterVersion) {
+    errors.push(
+      `latest.json version ${updater.version ?? "<missing>"} does not match stable updater ${stableUpdaterVersion}`,
+    );
   }
 
   for (const [platform, filenameTemplate] of Object.entries(REQUIRED_UPDATER_PLATFORMS)) {
@@ -50,14 +69,14 @@ export function verifyReleaseMetadata(repoRoot) {
     if (typeof entry.signature !== "string" || entry.signature.length === 0) {
       errors.push(`latest.json platform ${platform} is missing a signature`);
     }
-    const filename = filenameTemplate.replace("{version}", expectedVersion);
+    const filename = filenameTemplate.replace("{version}", stableUpdaterVersion);
     const expectedUrl =
       `https://github.com/Chaebin-Park/pdf-to-markdown/releases/download/` +
-      `v${expectedVersion}/${filename}`;
+      `v${stableUpdaterVersion}/${filename}`;
     if (entry.url !== expectedUrl) {
       errors.push(`latest.json platform ${platform} URL must be ${expectedUrl}`);
     }
   }
 
-  return { expectedVersion, errors };
+  return { expectedVersion, stableUpdaterVersion, channel: release.channel, errors };
 }

@@ -2,10 +2,12 @@
 
 ## Resource Gate
 
-`release-version.json` is the single expected release version. The verifier checks
-that it matches `tauri.conf.json`, `Cargo.toml`, and `latest.json`, and that updater
-metadata contains signed `darwin-aarch64` and `windows-x86_64` artifacts under the
-matching GitHub release tag.
+`release-version.json` defines the build version and release channel. The verifier
+checks that the build version matches `tauri.conf.json` and `Cargo.toml`. For a
+prerelease, `stableUpdaterVersion` keeps the checked-in `latest.json` on the latest
+stable release so an RC does not enter the automatic-update channel. The updater
+metadata must contain signed `darwin-aarch64` and `windows-x86_64` artifacts under
+that stable release tag.
 
 Run the dependency-free metadata tests:
 

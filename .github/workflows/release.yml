@@ -387,6 +387,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ contains(github.ref_name, '-') && 'false' || 'legacy' }}
           files: |
             artifacts/macos/*.tar.gz
             artifacts/macos/*.tar.gz.sig
